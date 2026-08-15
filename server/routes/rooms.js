@@ -39,21 +39,26 @@ router.get('/:roomId', protect, async (req, res) => {
 });
 
 // @route   GET /api/rooms/by-exchange/:exchangeId
-// @desc    Find a room by the exchange request ID
+// @desc    Find a room by the exchange request ID (with populated participants)
 // @access  Private
 router.get('/by-exchange/:exchangeId', protect, async (req, res) => {
   try {
-    const exReq = await ExchangeRequest.findById(req.params.exchangeId);
+    const exReq = await ExchangeRequest.findById(req.params.exchangeId)
+      .populate('senderId',   'name username')
+      .populate('receiverId', 'name username');
+
     if (!exReq) return res.status(404).json({ message: 'Exchange request not found' });
 
     const myId = req.user._id.toString();
-    if (myId !== exReq.senderId.toString() && myId !== exReq.receiverId.toString()) {
+    if (myId !== exReq.senderId._id.toString() && myId !== exReq.receiverId._id.toString()) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    const room = await Room.findOne({ exchangeRequestId: req.params.exchangeId });
+    const room = await Room.findOne({ exchangeRequestId: req.params.exchangeId }).lean();
     if (!room) return res.status(404).json({ message: 'Room not created yet' });
 
+    // Attach populated exchange request so client can determine partner name
+    room.exchangeRequestId = exReq;
     res.json(room);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -82,9 +82,9 @@ const runTests = async () => {
     const axB = makeAxios();
     const axC = makeAxios(); // uninvited third user
 
-    const { data: userA } = await axA.post('/auth/signup', { name:'Alice', username:'alice', email:'alice@test.com', password:'pw' });
-    const { data: userB } = await axB.post('/auth/signup', { name:'Bob',   username:'bob',   email:'bob@test.com',   password:'pw' });
-    await axC.post('/auth/signup', { name:'Eve', username:'eve', email:'eve@test.com', password:'pw' });
+    const { data: userA } = await axA.post('/auth/signup', { name:'Alice', username:'alice', email:'alice@test.com', password:'pw1234' });
+    const { data: userB } = await axB.post('/auth/signup', { name:'Bob',   username:'bob',   email:'bob@test.com',   password:'pw1234' });
+    await axC.post('/auth/signup', { name:'Eve', username:'eve', email:'eve@test.com', password:'pw1234' });
     console.log('[OK] Three users signed up');
 
     // ── 3. Accept a request so a Room is created ───────────────────────────
