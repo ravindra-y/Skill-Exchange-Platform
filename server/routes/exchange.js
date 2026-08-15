@@ -46,7 +46,7 @@ router.get('/', protect, async (req, res) => {
     const sent = await ExchangeRequest.find({ senderId: req.user._id })
       .populate('receiverId', 'name username avatarUrl')
       .sort({ createdAt: -1 });
-      
+
     const received = await ExchangeRequest.find({ receiverId: req.user._id })
       .populate('senderId', 'name username avatarUrl')
       .sort({ createdAt: -1 });
