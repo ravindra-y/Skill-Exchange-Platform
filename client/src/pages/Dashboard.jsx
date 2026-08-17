@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { Plus, Trash2, Loader2, MessageSquare } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
 
 const Dashboard = () => {
-  const { user, setUser } = useContext(AuthContext);
+  const { user, setUser, logout } = useContext(AuthContext);
   const chatCtx = useChat();
   const totalUnread = chatCtx?.totalUnread ?? 0;
+  const navigate = useNavigate();
   const [skills, setSkills]         = useState([]);
   const [allSkills, setAllSkills]   = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -20,6 +21,12 @@ const Dashboard = () => {
   // Profile edit state
   const [isEditing, setIsEditing]   = useState(false);
   const [bio, setBio]               = useState(user?.bio || '');
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword]   = useState('');
+  const [deleteError, setDeleteError]         = useState('');
+  const [deleting, setDeleting]               = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -74,6 +81,20 @@ const Dashboard = () => {
       fetchData();
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to remove skill.');
+    }
+  };
+
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await axios.delete('/users/me', { data: { password: deletePassword } });
+      await logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      setDeleteError(error.response?.data?.message || 'Failed to delete account.');
+      setDeleting(false);
     }
   };
 
@@ -225,6 +246,94 @@ const Dashboard = () => {
           </button>
         </form>
       </div>
+
+      {/* Danger Zone */}
+      <div className="bg-white shadow rounded-lg p-6 mt-8 border border-red-100">
+        <h3 className="text-lg font-semibold text-red-600 mb-2 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5" /> Danger Zone
+        </h3>
+        <p className="text-gray-600 text-sm mb-4">
+          Permanently delete your account and all associated data. This action cannot be undone.
+        </p>
+        <button
+          onClick={() => {
+            setShowDeleteModal(true);
+            setDeleteError('');
+            setDeletePassword('');
+          }}
+          className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-4 py-2 rounded-md text-sm font-medium transition"
+        >
+          Delete Account
+        </button>
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                Delete Account
+              </h3>
+              <button
+                onClick={() => !deleting && setShowDeleteModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition p-1"
+                disabled={deleting}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg mb-4 border border-red-100">
+                <p className="font-semibold mb-1">Warning: This action is permanent.</p>
+                <p>All your profile data, skills, exchange requests, and message history will be immediately deleted.</p>
+              </div>
+
+              {deleteError && (
+                <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">
+                  {deleteError}
+                </div>
+              )}
+
+              <form onSubmit={handleDeleteAccount}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Enter your password to confirm
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="block w-full border border-gray-300 rounded-md shadow-sm p-2.5 focus:ring-red-500 focus:border-red-500 sm:text-sm mb-6"
+                  placeholder="Password"
+                  disabled={deleting}
+                />
+                
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(false)}
+                    disabled={deleting}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!deletePassword || deleting}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]"
+                  >
+                    {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {deleting ? 'Deleting…' : 'Delete my account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

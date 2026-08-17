@@ -3,6 +3,10 @@ const { body, param, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const UserSkill = require('../models/UserSkill');
+const ExchangeRequest = require('../models/ExchangeRequest');
+const Message = require('../models/Message');
+const Room = require('../models/Room');
+const RoomParticipant = require('../models/RoomParticipant');
 const mongoose = require('mongoose');
 
 const router = express.Router();
@@ -117,3 +121,87 @@ router.delete('/skills/:id', protect, async (req, res) => {
 });
 
 module.exports = router;
+
+// @route   DELETE /api/users/me
+// @access  Private — user deletes their own account
+router.delete('/me', protect, async (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ message: 'Password is required to confirm deletion' });
+  }
+
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Re-authenticate
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Incorrect password' });
+    }
+
+    const userId = user._id;
+
+    // Use a transaction if supported, else safe-order deletion
+    let session = null;
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch (e) {
+      // If transactions are not supported (e.g. standalone mongod), session stays null
+      session = null;
+    }
+
+    const opts = session ? { session } : {};
+
+    try {
+      // 1. Find all exchange requests involving the user
+      const requests = await ExchangeRequest.find({
+        $or: [{ senderId: userId }, { receiverId: userId }]
+      }, null, opts);
+      const requestIds = requests.map(r => r._id);
+
+      // 2. Find all rooms related to those requests
+      const rooms = await Room.find({ exchangeRequestId: { $in: requestIds } }, null, opts);
+      const roomIds = rooms.map(r => r._id);
+
+      // 3. Delete messages in those requests
+      await Message.deleteMany({ exchangeRequestId: { $in: requestIds } }, opts);
+
+      // 4. Delete RoomParticipants in those rooms (and any dangling ones for this user)
+      await RoomParticipant.deleteMany({
+        $or: [{ roomId: { $in: roomIds } }, { userId }]
+      }, opts);
+
+      // 5. Delete the rooms
+      await Room.deleteMany({ _id: { $in: roomIds } }, opts);
+
+      // 6. Delete the exchange requests
+      await ExchangeRequest.deleteMany({ _id: { $in: requestIds } }, opts);
+
+      // 7. Delete user's skills
+      await UserSkill.deleteMany({ userId }, opts);
+
+      // 8. Delete the user
+      await User.deleteOne({ _id: userId }, opts);
+
+      if (session) {
+        await session.commitTransaction();
+        session.endSession();
+      }
+    } catch (err) {
+      if (session) {
+        await session.abortTransaction();
+        session.endSession();
+      }
+      throw err;
+    }
+
+    // Invalidate session
+    res.cookie('jwt', '', { httpOnly: true, expires: new Date(0) });
+    res.json({ message: 'Account and all related data deleted successfully' });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
