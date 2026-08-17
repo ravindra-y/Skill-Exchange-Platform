@@ -176,9 +176,9 @@ export default function ChatView() {
   // ─── Render ───────────────────────────────────────────────────────────────
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+      <div className="loading-page">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600">Loading conversation…</span>
+        <span className="ml-3 text-gray-600 font-medium">Loading conversation…</span>
       </div>
     );
   }
@@ -243,10 +243,12 @@ export default function ChatView() {
         )}
 
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-16">
-            <MessageSquare className="w-10 h-10 text-gray-300 mb-3" />
-            <p className="text-gray-500">No messages yet.</p>
-            <p className="text-sm text-gray-400 mt-1">Send the first message below.</p>
+          <div className="h-full flex items-center justify-center py-16">
+            <div className="empty-state w-full max-w-sm mx-auto border-none bg-transparent">
+              <MessageSquare className="empty-state-icon" />
+              <span className="empty-state-text">No messages yet.</span>
+              <span className="empty-state-subtext">Send the first message below.</span>
+            </div>
           </div>
         )}
 

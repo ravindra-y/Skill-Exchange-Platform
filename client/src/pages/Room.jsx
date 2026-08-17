@@ -72,7 +72,7 @@ function SessionComplete({ partnerName, durationSecs, recordingBlob }) {
         {recordingBlob && (
           <button
             onClick={handleDownload}
-            className="w-full mb-3 flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 transition"
+            className="btn-primary w-full mb-3 py-3 h-auto"
           >
             <Download className="w-5 h-5" />
             Download Recording (.webm)
@@ -82,7 +82,7 @@ function SessionComplete({ partnerName, durationSecs, recordingBlob }) {
         {/* Back to dashboard */}
         <Link
           to="/dashboard"
-          className="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
+          className="btn-secondary w-full py-3 h-auto"
         >
           <LayoutDashboard className="w-5 h-5" />
           Back to Dashboard
@@ -552,9 +552,9 @@ export default function Room() {
   // ═══════════════════════════════════════════════════════════════════════════
   if (roomLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+      <div className="loading-page">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600">Loading room…</span>
+        <span className="ml-3 text-gray-600 font-medium">Loading room…</span>
       </div>
     );
   }

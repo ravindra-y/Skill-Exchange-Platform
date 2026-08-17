@@ -20,9 +20,9 @@ function App() {
     <AuthProvider>
       <ChatProvider>
         <Router>
-          <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+          <div className="min-h-screen bg-slate-50 text-gray-900 font-sans flex flex-col">
             <Navbar />
-            <main>
+            <main className="flex-1 flex flex-col">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />

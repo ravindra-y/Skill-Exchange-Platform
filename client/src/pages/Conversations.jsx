@@ -40,9 +40,9 @@ export default function Conversations() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+      <div className="loading-page">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600">Loading conversations…</span>
+        <span className="ml-3 text-gray-600 font-medium">Loading conversations…</span>
       </div>
     );
   }
@@ -56,19 +56,17 @@ export default function Conversations() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8 flex items-center gap-3">
+    <div className="page-container max-w-3xl">
+      <h1 className="page-title">
         <MessageSquare className="w-8 h-8 text-indigo-600" />
         Messages
       </h1>
 
       {exchanges.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl shadow border border-gray-100">
-          <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No active conversations yet.</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Accept a skill exchange request to start chatting.
-          </p>
+        <div className="empty-state">
+          <MessageSquare className="empty-state-icon" />
+          <span className="empty-state-text">No active conversations yet.</span>
+          <span className="empty-state-subtext">Accept a skill exchange request to start chatting.</span>
         </div>
       ) : (
         <ul className="space-y-2">
