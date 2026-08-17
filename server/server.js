@@ -15,6 +15,7 @@ const skillRoutes    = require('./routes/skills');
 const discoverRoutes = require('./routes/discover');
 const exchangeRoutes = require('./routes/exchange');
 const roomRoutes     = require('./routes/rooms');
+const messagesRoutes = require('./routes/messages');
 
 const app    = express();
 const server = http.createServer(app);
@@ -45,6 +46,9 @@ const io = new Server(server, {
 
 setupSocket(io);
 
+// Expose io so REST routes can emit (e.g., HTTP-fallback message send)
+app.set('io', io);
+
 // ─── REST routes ─────────────────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
 app.use('/api/users',    userRoutes);
@@ -52,6 +56,7 @@ app.use('/api/skills',   skillRoutes);
 app.use('/api/discover', discoverRoutes);
 app.use('/api/exchange', exchangeRoutes);
 app.use('/api/rooms',    roomRoutes);
+app.use('/api/messages', messagesRoutes);
 
 // ─── Error handler ───────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {

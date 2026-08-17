@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, MessageSquare } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useChat } from '../context/ChatContext';
 
 const Dashboard = () => {
   const { user, setUser } = useContext(AuthContext);
+  const chatCtx = useChat();
+  const totalUnread = chatCtx?.totalUnread ?? 0;
   const [skills, setSkills]         = useState([]);
   const [allSkills, setAllSkills]   = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -92,6 +96,20 @@ const Dashboard = () => {
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
           {pageError}
         </div>
+      )}
+
+      {/* Unread messages banner */}
+      {totalUnread > 0 && (
+        <Link
+          to="/conversations"
+          className="flex items-center gap-3 mb-4 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg px-4 py-3 text-sm hover:bg-indigo-100 transition"
+        >
+          <MessageSquare className="w-4 h-4 shrink-0" />
+          <span>
+            You have <strong>{totalUnread}</strong> unread message{totalUnread !== 1 ? 's' : ''}.
+          </span>
+          <span className="ml-auto text-indigo-500 font-medium">View →</span>
+        </Link>
       )}
       <div className="bg-white shadow rounded-lg p-6 mb-8 border border-gray-100">
         <div className="flex justify-between items-start mb-4">

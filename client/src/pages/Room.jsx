@@ -12,8 +12,9 @@ import api from '../api/axios';
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff,
   ArrowLeft, Pencil, Eraser, Trash2, Wifi, WifiOff,
-  Loader2, Circle, Download, LayoutDashboard,
+  Loader2, Circle, Download, LayoutDashboard, MessageSquare,
 } from 'lucide-react';
+import ChatPanel from '../components/ChatPanel';
 
 const SOCKET_URL = 'http://localhost:5000';
 
@@ -119,6 +120,9 @@ export default function Room() {
 
   // ── Recording state ────────────────────────────────────────────────────────
   const [isRecording, setIsRecording]   = useState(false);
+
+  // ── Chat panel state ───────────────────────────────────────────────────────
+  const [chatOpen, setChatOpen]         = useState(false);
 
   // ── Session timer ──────────────────────────────────────────────────────────
   const [elapsed, setElapsed] = useState(0);
@@ -649,6 +653,15 @@ export default function Room() {
             {camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
           </button>
 
+          {/* Chat toggle */}
+          <button
+            onClick={() => setChatOpen(o => !o)}
+            title={chatOpen ? 'Close chat' : 'Open chat'}
+            className={`p-2 rounded-lg transition ${chatOpen ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'}`}
+          >
+            <MessageSquare className="w-4 h-4" />
+          </button>
+
           {/* Leave */}
           <button
             onClick={handleLeave}
@@ -676,7 +689,7 @@ export default function Room() {
         </div>
       )}
 
-      {/* ── Body: video panel + whiteboard ───────────────────────────────── */}
+      {/* ── Body: video panel + whiteboard + optional chat ─────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left: video tiles */}
@@ -738,7 +751,7 @@ export default function Room() {
           )}
         </div>
 
-        {/* Right: whiteboard */}
+        {/* Centre: whiteboard */}
         <div className="flex flex-col flex-1 overflow-hidden">
           {/* Toolbar */}
           <div className="flex items-center gap-3 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0 flex-wrap">
@@ -807,6 +820,16 @@ export default function Room() {
             onTouchEnd={onPointerUp}
           />
         </div>
+
+        {/* Right: chat panel (toggled) */}
+        {chatOpen && (
+          <div className="w-72 shrink-0">
+            <ChatPanel
+              exchangeRequestId={exchangeRequestId}
+              onClose={() => setChatOpen(false)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

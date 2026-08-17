@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const cookie = require('cookie');
 const Room = require('../models/Room');
 const ExchangeRequest = require('../models/ExchangeRequest');
+const Message = require('../models/Message');
 
 /**
  * socketHandler sets up all Socket.io events.
@@ -28,11 +29,11 @@ module.exports = function setupSocket(io) {
     }
   });
 
-  // ─── Tracks: roomId → Set of socketIds currently in the room ─────────────
+  // ─── Tracks: roomId → Set of socketIds currently in the video room ───────
   const roomSockets = new Map(); // roomId → Set<socketId>
 
   io.on('connection', (socket) => {
-    // ─── join-room ────────────────────────────────────────────────────────
+    // ─── join-room (video room) ───────────────────────────────────────────
     socket.on('join-room', async ({ roomId }) => {
       try {
         if (!roomId) {
@@ -58,12 +59,12 @@ module.exports = function setupSocket(io) {
           return;
         }
 
-        // 3. Leave any previous rooms this socket was in
+        // 3. Leave any previous video rooms this socket was in
         for (const r of socket.rooms) {
-          if (r !== socket.id) socket.leave(r);
+          if (r !== socket.id && !r.startsWith('chat:')) socket.leave(r);
         }
 
-        // 4. Join the Socket.io room
+        // 4. Join the Socket.io video room
         socket.join(roomId);
         socket.currentRoomId = roomId;
 
@@ -95,7 +96,6 @@ module.exports = function setupSocket(io) {
     // ─── Whiteboard sync ─────────────────────────────────────────────────
     socket.on('draw', ({ roomId, stroke }) => {
       if (!roomId || socket.currentRoomId !== roomId) return;
-      // Relay to the other participant only
       socket.to(roomId).emit('draw', { stroke });
     });
 
@@ -104,7 +104,7 @@ module.exports = function setupSocket(io) {
       socket.to(roomId).emit('whiteboard-clear');
     });
 
-    // ─── Leave / disconnect cleanup ───────────────────────────────────────
+    // ─── Leave / disconnect cleanup (video room) ──────────────────────────
     const handleLeave = () => {
       const roomId = socket.currentRoomId;
       if (!roomId) return;
@@ -122,5 +122,107 @@ module.exports = function setupSocket(io) {
 
     socket.on('leave-room', handleLeave);
     socket.on('disconnect', handleLeave);
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CHAT EVENTS — keyed by exchangeRequestId, independent of the video room
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ─── chat:join ───────────────────────────────────────────────────────
+    // Client calls this to subscribe to live messages for a conversation.
+    // Does NOT require the user to be in the video room.
+    socket.on('chat:join', async ({ exchangeRequestId }) => {
+      try {
+        if (!exchangeRequestId) {
+          socket.emit('chat:error', { message: 'exchangeRequestId is required' });
+          return;
+        }
+
+        const exReq = await ExchangeRequest.findById(exchangeRequestId);
+        if (!exReq) {
+          socket.emit('chat:error', { message: 'Exchange request not found' });
+          return;
+        }
+        if (exReq.status !== 'accepted') {
+          socket.emit('chat:error', { message: 'Exchange request is not accepted' });
+          return;
+        }
+
+        const senderId   = exReq.senderId.toString();
+        const receiverId = exReq.receiverId.toString();
+
+        if (socket.userId !== senderId && socket.userId !== receiverId) {
+          socket.emit('chat:error', { message: 'FORBIDDEN: not a participant' });
+          return;
+        }
+
+        const chatRoom = 'chat:' + exchangeRequestId;
+        socket.join(chatRoom);
+        socket.emit('chat:joined', { exchangeRequestId });
+      } catch (err) {
+        console.error('[socket chat:join error]', err);
+        socket.emit('chat:error', { message: 'Server error joining chat' });
+      }
+    });
+
+    // ─── chat:send ───────────────────────────────────────────────────────
+    // Primary path for sending a message in real time.
+    // Persists to DB and broadcasts to the chat room.
+    socket.on('chat:send', async ({ exchangeRequestId, text }) => {
+      try {
+        if (!exchangeRequestId || !text || !text.trim()) {
+          socket.emit('chat:error', { message: 'exchangeRequestId and text are required' });
+          return;
+        }
+
+        if (text.trim().length > 4000) {
+          socket.emit('chat:error', { message: 'Message too long (max 4000 chars)' });
+          return;
+        }
+
+        const exReq = await ExchangeRequest.findById(exchangeRequestId);
+        if (!exReq) {
+          socket.emit('chat:error', { message: 'Exchange request not found' });
+          return;
+        }
+        if (exReq.status !== 'accepted') {
+          socket.emit('chat:error', { message: 'Exchange request is not accepted' });
+          return;
+        }
+
+        const senderId   = exReq.senderId.toString();
+        const receiverId = exReq.receiverId.toString();
+
+        if (socket.userId !== senderId && socket.userId !== receiverId) {
+          socket.emit('chat:error', { message: 'FORBIDDEN: not a participant' });
+          return;
+        }
+
+        // Persist first, then broadcast
+        const message = await Message.create({
+          exchangeRequestId,
+          senderId: socket.userId,
+          text: text.trim(),
+        });
+
+        const populated = await message.populate('senderId', 'name username');
+
+        // Broadcast to all sockets in this chat room (including the sender's own socket)
+        io.to('chat:' + exchangeRequestId).emit('chat:message', populated);
+      } catch (err) {
+        console.error('[socket chat:send error]', err);
+        socket.emit('chat:error', { message: 'Server error sending message' });
+      }
+    });
+
+    // ─── chat:typing ─────────────────────────────────────────────────────
+    // Optional typing indicator — relays to the other participant only.
+    socket.on('chat:typing', ({ exchangeRequestId, isTyping }) => {
+      if (!exchangeRequestId) return;
+      // Relay to others in the chat room (not back to the sender)
+      socket.to('chat:' + exchangeRequestId).emit('chat:typing', {
+        userId: socket.userId,
+        isTyping: !!isTyping,
+      });
+    });
   });
 };
