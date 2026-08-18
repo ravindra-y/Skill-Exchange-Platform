@@ -46,25 +46,27 @@ function SessionComplete({ partnerName, durationSecs, recordingBlob }) {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] bg-gray-50 px-4">
-      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-10 max-w-md w-full text-center">
+    <div className="flex items-center justify-center min-h-[calc(100vh-70px)] bg-brand-bg px-6">
+      <div className="bg-brand-surface border border-black/[0.08] rounded-[8px] p-10 max-w-md w-full text-center">
         {/* Icon */}
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Wifi className="w-10 h-10 text-green-600" />
+        <div className="w-16 h-16 bg-brand-surface-2 border border-black/[0.08] rounded-full flex items-center justify-center mx-auto mb-6">
+          <Wifi className="w-8 h-8 text-brand-muted" />
         </div>
 
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Session Complete</h1>
-        <p className="text-gray-500 mb-8">Great session with <span className="font-semibold text-gray-800">{partnerName || 'your partner'}</span>!</p>
+        <h1 className="text-2xl font-medium tracking-tight text-brand-text mb-2">Session complete</h1>
+        <p className="text-sm text-brand-muted mb-8">
+          Great session with <span className="font-medium text-brand-text">{partnerName || 'your partner'}</span>!
+        </p>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-gray-50 rounded-xl p-4 text-center">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Duration</p>
-            <p className="text-2xl font-bold text-gray-900 font-mono">{formatTime(durationSecs)}</p>
+        <div className="grid grid-cols-2 gap-3 mb-8">
+          <div className="bg-brand-surface-2 rounded-[8px] p-4 text-center">
+            <p className="text-xs uppercase tracking-label text-brand-muted mb-1">Duration</p>
+            <p className="text-xl font-medium text-brand-text font-mono">{formatTime(durationSecs)}</p>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4 text-center">
-            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Recording</p>
-            <p className="text-2xl font-bold text-gray-900">{recordingBlob ? '✓ Ready' : '—'}</p>
+          <div className="bg-brand-surface-2 rounded-[8px] p-4 text-center">
+            <p className="text-xs uppercase tracking-label text-brand-muted mb-1">Recording</p>
+            <p className="text-xl font-medium text-brand-text">{recordingBlob ? '✓ Ready' : '—'}</p>
           </div>
         </div>
 
@@ -72,9 +74,9 @@ function SessionComplete({ partnerName, durationSecs, recordingBlob }) {
         {recordingBlob && (
           <button
             onClick={handleDownload}
-            className="btn-primary w-full mb-3 py-3 h-auto"
+            className="btn-primary w-full mb-3"
           >
-            <Download className="w-5 h-5" />
+            <Download className="w-4 h-4" />
             Download Recording (.webm)
           </button>
         )}
@@ -82,9 +84,9 @@ function SessionComplete({ partnerName, durationSecs, recordingBlob }) {
         {/* Back to dashboard */}
         <Link
           to="/dashboard"
-          className="btn-secondary w-full py-3 h-auto"
+          className="btn-secondary w-full justify-center"
         >
-          <LayoutDashboard className="w-5 h-5" />
+          <LayoutDashboard className="w-4 h-4" />
           Back to Dashboard
         </Link>
       </div>
@@ -553,21 +555,21 @@ export default function Room() {
   if (roomLoading) {
     return (
       <div className="loading-page">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600 font-medium">Loading room…</span>
+        <Loader2 className="w-6 h-6 animate-spin text-brand-text" />
+        <span className="ml-3 text-sm text-brand-muted">Loading room…</span>
       </div>
     );
   }
 
   if (roomError) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] px-4 text-center">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-8 max-w-md">
-          <WifiOff className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-red-700 mb-2">Cannot join room</h2>
-          <p className="text-red-600 mb-6">{roomError}</p>
-          <Link to="/requests" className="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-medium">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Requests
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-70px)] px-6 text-center bg-brand-bg">
+        <div className="bg-brand-surface border border-black/[0.08] rounded-[8px] p-8 max-w-md">
+          <WifiOff className="w-10 h-10 text-brand-muted mx-auto mb-4" />
+          <h2 className="text-lg font-medium text-brand-text mb-2">Cannot join room</h2>
+          <p className="text-sm text-brand-muted mb-6">{roomError}</p>
+          <Link to="/requests" className="inline-flex items-center text-sm font-medium text-brand-text underline underline-offset-2 hover:opacity-70 transition-opacity">
+            <ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Requests
           </Link>
         </div>
       </div>
@@ -657,7 +659,7 @@ export default function Room() {
           <button
             onClick={() => setChatOpen(o => !o)}
             title={chatOpen ? 'Close chat' : 'Open chat'}
-            className={`p-2 rounded-lg transition ${chatOpen ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'}`}
+            className={`p-2 rounded-lg transition ${chatOpen ? 'bg-gray-500 hover:bg-gray-400' : 'bg-gray-700 hover:bg-gray-600'}`}
           >
             <MessageSquare className="w-4 h-4" />
           </button>
@@ -744,7 +746,7 @@ export default function Room() {
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              className="flex items-center justify-center gap-2 py-2 bg-indigo-700 hover:bg-indigo-600 rounded-lg text-xs font-medium transition"
+              className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-medium transition"
             >
               <Download className="w-3 h-3" /> Download Recording
             </button>
@@ -757,14 +759,14 @@ export default function Room() {
           <div className="flex items-center gap-3 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0 flex-wrap">
             <button
               onClick={() => setTool('pen')}
-              className={`p-2 rounded-lg transition ${tool === 'pen' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+              className={`p-2 rounded-lg transition ${tool === 'pen' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`}
               title="Pen"
             >
               <Pencil className="w-4 h-4" />
             </button>
             <button
               onClick={() => setTool('eraser')}
-              className={`p-2 rounded-lg transition ${tool === 'eraser' ? 'bg-indigo-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+              className={`p-2 rounded-lg transition ${tool === 'eraser' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`}
               title="Eraser"
             >
               <Eraser className="w-4 h-4" />
@@ -791,7 +793,7 @@ export default function Room() {
               type="range" min="1" max="20"
               value={strokeWidth}
               onChange={e => setStrokeWidth(Number(e.target.value))}
-              className="w-24 accent-indigo-500"
+              className="w-24 accent-brand-text"
               title="Stroke width"
             />
             <span className="text-xs text-gray-400 w-4">{strokeWidth}</span>

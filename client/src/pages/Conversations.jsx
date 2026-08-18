@@ -15,13 +15,11 @@ export default function Conversations() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Reuse the existing exchange endpoint — filter to accepted ones
         const { data } = await api.get('/exchange');
         const accepted = [
           ...data.sent.filter(r => r.status === 'accepted'),
           ...data.received.filter(r => r.status === 'accepted'),
         ];
-        // Deduplicate by _id (shouldn't be dupes, but defensive)
         const seen = new Set();
         const unique = accepted.filter(r => {
           if (seen.has(r._id)) return false;
@@ -38,35 +36,30 @@ export default function Conversations() {
     load();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="loading-page">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600 font-medium">Loading conversations…</span>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="loading-page">
+      <Loader2 className="w-6 h-6 animate-spin text-brand-text" />
+      <span className="ml-3 text-sm text-brand-muted">Loading…</span>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">{error}</div>
-      </div>
-    );
-  }
+  if (error) return (
+    <div className="max-w-2xl mx-auto px-6 py-10">
+      <div className="px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">{error}</div>
+    </div>
+  );
 
   return (
-    <div className="page-container max-w-3xl">
-      <h1 className="page-title">
-        <MessageSquare className="w-8 h-8 text-indigo-600" />
+    <div className="max-w-2xl mx-auto px-6 py-10 sm:px-8">
+      <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8 flex items-center gap-3">
         Messages
       </h1>
 
       {exchanges.length === 0 ? (
-        <div className="empty-state">
-          <MessageSquare className="empty-state-icon" />
-          <span className="empty-state-text">No active conversations yet.</span>
-          <span className="empty-state-subtext">Accept a skill exchange request to start chatting.</span>
+        <div className="empty-card">
+          <MessageSquare className="w-8 h-8 text-brand-line mx-auto mb-3" />
+          <p className="text-sm text-brand-muted">No active conversations yet.</p>
+          <p className="text-xs text-brand-faint mt-1">Accept a skill exchange request to start chatting.</p>
         </div>
       ) : (
         <ul className="space-y-2">
@@ -80,26 +73,26 @@ export default function Conversations() {
               <li key={req._id}>
                 <Link
                   to={`/conversations/${req._id}`}
-                  className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:border-indigo-200 hover:shadow-md transition group"
+                  className="flex items-center justify-between p-4 card hover:border-black/[0.16] transition-colors group"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Avatar placeholder */}
-                    <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                      <span className="text-indigo-700 font-semibold text-lg">
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-brand-surface-2 border border-black/[0.08] flex items-center justify-center shrink-0">
+                      <span className="text-sm font-medium text-brand-muted">
                         {(partner?.name || '?')[0].toUpperCase()}
                       </span>
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900 group-hover:text-indigo-700 transition">
+                      <p className="text-sm font-medium text-brand-text group-hover:text-brand-text transition-colors">
                         {partner?.name || 'Unknown'}
                       </p>
-                      <p className="text-sm text-gray-500">@{partner?.username || '—'}</p>
+                      <p className="text-xs text-brand-faint">@{partner?.username || '—'}</p>
                     </div>
                   </div>
 
                   {unread > 0 && (
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold shrink-0">
-                      {unread > 99 ? '99+' : unread}
+                    <span className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-brand-text text-brand-bg shrink-0">
+                      {unread > 9 ? '9+' : unread}
                     </span>
                   )}
                 </Link>

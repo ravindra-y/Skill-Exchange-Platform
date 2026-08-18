@@ -143,7 +143,7 @@ export default function ChatPanel({ exchangeRequestId, onClose }) {
       {/* Panel header */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
         <span className="flex items-center gap-2 text-sm font-medium text-gray-200">
-          <MessageSquare className="w-4 h-4 text-indigo-400" />
+          <MessageSquare className="w-4 h-4 text-gray-400" />
           Chat
         </span>
         <button
@@ -161,7 +161,7 @@ export default function ChatPanel({ exchangeRequestId, onClose }) {
           <button
             onClick={loadMore}
             disabled={loadingMore}
-            className="w-full text-xs text-indigo-400 hover:text-indigo-300 py-1 disabled:opacity-50"
+            className="w-full text-xs text-gray-400 hover:text-white py-1 disabled:opacity-50"
           >
             {loadingMore ? 'Loading…' : 'Load earlier'}
           </button>
@@ -169,7 +169,7 @@ export default function ChatPanel({ exchangeRequestId, onClose }) {
 
         {loading && (
           <div className="flex justify-center py-4">
-            <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
           </div>
         )}
 
@@ -185,12 +185,12 @@ export default function ChatPanel({ exchangeRequestId, onClose }) {
               <div
                 className={`max-w-[85%] px-3 py-1.5 rounded-xl text-sm ${
                   isMe
-                    ? 'bg-indigo-600 text-white rounded-br-none'
+                    ? 'bg-white/20 text-white rounded-br-none'
                     : 'bg-gray-700 text-gray-100 rounded-bl-none'
                 }`}
               >
                 <p className="break-words whitespace-pre-wrap">{msg.text}</p>
-                <p className={`text-xs mt-0.5 text-right ${isMe ? 'text-indigo-300' : 'text-gray-400'}`}>
+                <p className={`text-xs mt-0.5 text-right ${isMe ? 'text-white/50' : 'text-gray-400'}`}>
                   {formatTime(msg.createdAt)}
                 </p>
               </div>
@@ -218,13 +218,13 @@ export default function ChatPanel({ exchangeRequestId, onClose }) {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Message… (Enter)"
-          className="flex-1 resize-none bg-gray-700 border border-gray-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400 max-h-28 overflow-y-auto"
+          className="flex-1 resize-none bg-gray-700 border border-gray-600 text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-white/30 max-h-28 overflow-y-auto"
           style={{ minHeight: '38px' }}
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || sending}
-          className="p-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg transition shrink-0"
+          className="p-2 bg-gray-600 hover:bg-gray-500 disabled:opacity-40 text-white rounded-lg transition shrink-0"
         >
           {sending
             ? <Loader2 className="w-4 h-4 animate-spin" />

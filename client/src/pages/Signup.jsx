@@ -29,11 +29,26 @@ const Signup = () => {
   };
 
   return (
-    <div className="flex items-center justify-center flex-1 px-4 py-12">
-      <div className="max-w-md w-full card card-body">
-        <h2 className="text-3xl font-bold text-center text-gray-900 mb-6 tracking-tight">Create an account</h2>
-        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm border border-red-100">{error}</div>}
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="flex items-center justify-center min-h-[calc(100vh-70px)] px-6 py-12 bg-brand-bg">
+      <div className="w-full max-w-sm">
+        {/* Heading */}
+        <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-1">Create account</h1>
+        <p className="text-sm text-brand-muted mb-8">
+          Already have an account?{' '}
+          <Link to="/login" className="text-brand-text underline underline-offset-2 hover:opacity-70 transition-opacity">
+            Sign in
+          </Link>
+        </p>
+
+        {/* Error */}
+        {error && (
+          <div className="mb-5 px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="input-label">Full Name</label>
             <input
@@ -77,15 +92,12 @@ const Signup = () => {
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full mt-2"
+            className="btn-primary w-full py-2.5 mt-1"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {loading ? 'Creating account…' : 'Sign up'}
+            {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account? <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium transition">Log in</Link>
-        </p>
       </div>
     </div>
   );

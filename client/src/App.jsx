@@ -20,7 +20,7 @@ function App() {
     <AuthProvider>
       <ChatProvider>
         <Router>
-          <div className="min-h-screen bg-slate-50 text-gray-900 font-sans flex flex-col">
+          <div className="min-h-screen bg-brand-bg text-brand-text font-sans flex flex-col">
             <Navbar />
             <main className="flex-1 flex flex-col">
               <Routes>

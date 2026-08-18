@@ -9,39 +9,35 @@ import { useParams, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import api from '../api/axios';
-import {
-  ArrowLeft, Send, Loader2, MessageSquare,
-} from 'lucide-react';
+import { ArrowLeft, Send, Loader2, MessageSquare } from 'lucide-react';
 
 export default function ChatView() {
   const { exchangeRequestId } = useParams();
   const { user } = useContext(AuthContext);
   const { socket: socketRef, joinChat, markRead, sendMessage } = useChat();
 
-  const [messages, setMessages]   = useState([]);
-  const [hasMore, setHasMore]     = useState(false);
+  const [messages, setMessages]       = useState([]);
+  const [hasMore, setHasMore]         = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [fetchError, setFetchError] = useState('');
-  const [input, setInput]         = useState('');
-  const [sending, setSending]     = useState(false);
+  const [fetchError, setFetchError]   = useState('');
+  const [input, setInput]             = useState('');
+  const [sending, setSending]         = useState(false);
   const [partnerName, setPartnerName] = useState('');
   const [typingUsers, setTypingUsers] = useState(new Set());
 
-  const bottomRef  = useRef(null);
-  const inputRef   = useRef(null);
+  const bottomRef   = useRef(null);
+  const inputRef    = useRef(null);
   const typingTimer = useRef(null);
 
   // ─── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
-        // Load initial history (most recent 30 messages)
         const { data } = await api.get(`/messages/${exchangeRequestId}?limit=30`);
         setMessages(data.messages);
         setHasMore(data.hasMore);
 
-        // Derive partner name from exchange request participants
         const { data: exData } = await api.get('/exchange');
         const all = [...exData.sent, ...exData.received];
         const req = all.find(r => r._id === exchangeRequestId);
@@ -61,7 +57,7 @@ export default function ChatView() {
     init();
   }, [exchangeRequestId, user]);
 
-  // ─── Join chat socket room, mark as read ─────────────────────────────────
+  // ─── Join chat socket room, mark as read ──────────────────────────────────
   useEffect(() => {
     joinChat(exchangeRequestId);
     markRead(exchangeRequestId);
@@ -77,7 +73,6 @@ export default function ChatView() {
       const msgExId = msg.exchangeRequestId?._id || msg.exchangeRequestId;
       if (msgExId !== exchangeRequestId) return;
       setMessages(prev => [...prev, msg]);
-      // Mark as read immediately since the user is in this view
       markRead(exchangeRequestId);
     };
 
@@ -99,7 +94,7 @@ export default function ChatView() {
     };
   }, [socketRef, exchangeRequestId, user, markRead]);
 
-  // ─── Auto-scroll to bottom on new messages ───────────────────────────────
+  // ─── Auto-scroll to bottom on new messages ────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -127,11 +122,8 @@ export default function ChatView() {
     setSending(true);
     try {
       await sendMessage(exchangeRequestId, text);
-      // If socket delivered it, the chat:message event will append it.
-      // If REST fallback was used, sendMessage() returns the persisted message
-      // but we let the server emit handle deduplication via socket.
     } catch (err) {
-      setInput(text); // restore on failure
+      setInput(text);
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -157,11 +149,8 @@ export default function ChatView() {
     typingTimer.current = setTimeout(() => emitTyping(false), 1500);
   };
 
-  // ─── Format timestamp ─────────────────────────────────────────────────────
-  const formatTime = (iso) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  const formatTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const formatDate = (iso) => {
     const d = new Date(iso);
@@ -174,24 +163,20 @@ export default function ChatView() {
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
-  if (initialLoading) {
-    return (
-      <div className="loading-page">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <span className="ml-3 text-gray-600 font-medium">Loading conversation…</span>
-      </div>
-    );
-  }
+  if (initialLoading) return (
+    <div className="flex items-center justify-center min-h-[calc(100vh-70px)] bg-brand-bg">
+      <Loader2 className="w-6 h-6 animate-spin text-brand-text" />
+      <span className="ml-3 text-sm text-brand-muted">Loading conversation…</span>
+    </div>
+  );
 
-  if (fetchError) {
-    return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
-          {fetchError}
-        </div>
+  if (fetchError) return (
+    <div className="max-w-2xl mx-auto px-6 py-10">
+      <div className="px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">
+        {fetchError}
       </div>
-    );
-  }
+    </div>
+  );
 
   // Group messages by date
   const grouped = [];
@@ -206,49 +191,46 @@ export default function ChatView() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
+    <div className="flex flex-col h-[calc(100vh-70px)] bg-brand-surface-2">
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-3 bg-white shadow-sm border-b border-gray-200 shrink-0">
-        <Link to="/conversations" className="text-gray-500 hover:text-indigo-600 transition">
+      <div className="flex items-center gap-3 px-4 py-3 bg-brand-surface border-b border-black/[0.08] shrink-0">
+        <Link to="/conversations" className="text-brand-muted hover:text-brand-text transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-          <span className="text-indigo-700 font-semibold">
+        <div className="w-8 h-8 rounded-full bg-brand-surface-2 border border-black/[0.08] flex items-center justify-center shrink-0">
+          <span className="text-xs font-medium text-brand-muted">
             {(partnerName || '?')[0].toUpperCase()}
           </span>
         </div>
         <div>
-          <p className="font-semibold text-gray-900 leading-tight">{partnerName}</p>
+          <p className="text-sm font-medium text-brand-text leading-tight">{partnerName}</p>
           {typingUsers.size > 0 && (
-            <p className="text-xs text-indigo-500 animate-pulse">typing…</p>
+            <p className="text-xs text-brand-muted animate-pulse">typing…</p>
           )}
         </div>
       </div>
 
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {/* Load more */}
         {hasMore && (
           <div className="flex justify-center mb-4">
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1 disabled:opacity-50"
+              className="text-xs text-brand-muted hover:text-brand-text transition-colors underline underline-offset-2 disabled:opacity-50"
             >
               {loadingMore
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
+                ? <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Loading…</>
                 : 'Load earlier messages'}
             </button>
           </div>
         )}
 
         {messages.length === 0 && (
-          <div className="h-full flex items-center justify-center py-16">
-            <div className="empty-state w-full max-w-sm mx-auto border-none bg-transparent">
-              <MessageSquare className="empty-state-icon" />
-              <span className="empty-state-text">No messages yet.</span>
-              <span className="empty-state-subtext">Send the first message below.</span>
-            </div>
+          <div className="flex flex-col items-center justify-center h-full text-center py-16">
+            <MessageSquare className="w-8 h-8 text-brand-line mb-3" />
+            <p className="text-sm text-brand-muted">No messages yet.</p>
+            <p className="text-xs text-brand-faint mt-1">Send the first message below.</p>
           </div>
         )}
 
@@ -256,9 +238,9 @@ export default function ChatView() {
           if (item.type === 'date') {
             return (
               <div key={item.key} className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-gray-200" />
-                <span className="text-xs text-gray-400 shrink-0">{item.label}</span>
-                <div className="flex-1 h-px bg-gray-200" />
+                <div className="flex-1 h-px bg-brand-line/40" />
+                <span className="text-xs text-brand-faint shrink-0">{item.label}</span>
+                <div className="flex-1 h-px bg-brand-line/40" />
               </div>
             );
           }
@@ -273,14 +255,14 @@ export default function ChatView() {
               className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}
             >
               <div
-                className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                className={`max-w-[75%] px-4 py-2 rounded-[8px] text-sm leading-relaxed ${
                   isMe
-                    ? 'bg-indigo-600 text-white rounded-br-sm'
-                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
+                    ? 'bg-brand-text text-brand-bg rounded-br-sm'
+                    : 'bg-brand-surface border border-black/[0.08] text-brand-text rounded-bl-sm'
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                <p className={`text-xs mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>
+                <p className={`text-xs mt-1 text-right ${isMe ? 'text-brand-bg/50' : 'text-brand-faint'}`}>
                   {formatTime(msg.createdAt)}
                 </p>
               </div>
@@ -292,7 +274,7 @@ export default function ChatView() {
       </div>
 
       {/* Input bar */}
-      <div className="shrink-0 bg-white border-t border-gray-200 px-4 py-3 flex items-end gap-3">
+      <div className="shrink-0 bg-brand-surface border-t border-black/[0.08] px-4 py-3 flex items-end gap-3">
         <textarea
           ref={inputRef}
           rows={1}
@@ -300,13 +282,13 @@ export default function ChatView() {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Type a message… (Enter to send)"
-          className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent max-h-32 overflow-y-auto"
+          className="flex-1 resize-none bg-brand-surface-2 border border-black/[0.10] rounded-[8px] px-3 py-2.5 text-sm text-brand-text placeholder:text-brand-faint focus:outline-none focus:ring-2 focus:ring-brand-text/20 focus:border-brand-text/40 max-h-32 overflow-y-auto transition-colors"
           style={{ minHeight: '44px' }}
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || sending}
-          className="p-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition shrink-0"
+          className="p-2.5 bg-brand-text hover:brightness-[1.08] disabled:opacity-40 disabled:cursor-not-allowed text-brand-bg rounded-[8px] transition-all shrink-0"
           title="Send message"
         >
           {sending

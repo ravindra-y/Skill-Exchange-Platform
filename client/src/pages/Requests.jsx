@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { Check, X, Video, Inbox, Loader2 } from 'lucide-react';
+import { Check, X, Video, Loader2 } from 'lucide-react';
 
 const Requests = () => {
   const { user } = useContext(AuthContext);
@@ -27,70 +27,74 @@ const Requests = () => {
   const handleUpdateStatus = async (id, status) => {
     try {
       await axios.put(`/exchange/${id}/status`, { status });
-      fetchRequests(); // refresh
+      fetchRequests();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to update status');
     }
   };
 
   const RequestCard = ({ req, isReceived }) => {
-    const otherUser = isReceived ? req.senderId : req.receiverId;
-    const isPending = req.status === 'pending';
+    const otherUser  = isReceived ? req.senderId : req.receiverId;
+    const isPending  = req.status === 'pending';
     const isAccepted = req.status === 'accepted';
 
     return (
-      <div className="card mb-4">
-        <div className="card-body flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 sm:p-5">
-          <div className="mb-4 sm:mb-0">
-            <div className="flex items-center space-x-3 mb-1">
-              <h3 className="font-semibold text-gray-900">{otherUser.name}</h3>
-              <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide ${
-                req.status === 'pending' ? 'bg-amber-100 text-amber-800' :
-                req.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {req.status}
-              </span>
-            </div>
-            <p className="text-sm text-gray-500">
-              {isReceived ? 'Wants to exchange skills with you' : 'You requested to exchange skills'}
-            </p>
+      <div className="card card-body flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        {/* Info */}
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-sm font-medium text-brand-text">{otherUser.name}</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+              req.status === 'pending'
+                ? 'bg-brand-surface-2 text-brand-muted border border-black/[0.08]'
+                : req.status === 'accepted'
+                ? 'bg-brand-text text-brand-bg'
+                : 'bg-brand-surface-2 text-brand-faint'
+            }`}>
+              {req.status}
+            </span>
           </div>
+          <p className="text-xs text-brand-muted">
+            {isReceived
+              ? 'Wants to exchange skills with you'
+              : 'You requested to exchange skills'}
+          </p>
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            {isReceived && isPending && (
-              <>
-                <button 
-                  onClick={() => handleUpdateStatus(req._id, 'accepted')}
-                  className="btn-primary w-full sm:w-auto"
-                >
-                  <Check className="w-4 h-4" /> Accept
-                </button>
-                <button 
-                  onClick={() => handleUpdateStatus(req._id, 'rejected')}
-                  className="btn-danger w-full sm:w-auto bg-red-100 text-red-700 hover:bg-red-200 border-none shadow-none"
-                >
-                  <X className="w-4 h-4" /> Reject
-                </button>
-              </>
-            )}
-            {!isReceived && isPending && (
-              <button 
-                onClick={() => handleUpdateStatus(req._id, 'cancelled')}
-                className="btn-secondary w-full sm:w-auto"
+        {/* Actions */}
+        <div className="flex gap-2 w-full sm:w-auto shrink-0">
+          {isReceived && isPending && (
+            <>
+              <button
+                onClick={() => handleUpdateStatus(req._id, 'accepted')}
+                className="btn-primary flex-1 sm:flex-none py-1.5"
               >
-                Cancel Request
+                <Check className="w-4 h-4" /> Accept
               </button>
-            )}
-            {isAccepted && (
-              <Link 
-                to={`/room/${req._id}`}
-                className="btn-primary w-full sm:w-auto"
+              <button
+                onClick={() => handleUpdateStatus(req._id, 'rejected')}
+                className="flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-full border border-status-error/30 text-status-error hover:bg-status-error/5 flex items-center justify-center gap-1 transition-colors"
               >
-                <Video className="w-4 h-4" /> Enter Room
-              </Link>
-            )}
-          </div>
+                <X className="w-4 h-4" /> Reject
+              </button>
+            </>
+          )}
+          {!isReceived && isPending && (
+            <button
+              onClick={() => handleUpdateStatus(req._id, 'cancelled')}
+              className="btn-secondary flex-1 sm:flex-none py-1.5"
+            >
+              Cancel
+            </button>
+          )}
+          {isAccepted && (
+            <Link
+              to={`/room/${req._id}`}
+              className="btn-primary flex-1 sm:flex-none justify-center py-1.5"
+            >
+              <Video className="w-4 h-4" /> Enter Room
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -98,39 +102,46 @@ const Requests = () => {
 
   if (loading) return (
     <div className="loading-page">
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      <span className="ml-3 text-gray-600 font-medium">Loading requests…</span>
+      <Loader2 className="w-6 h-6 animate-spin text-brand-text" />
+      <span className="ml-3 text-sm text-brand-muted">Loading requests…</span>
     </div>
   );
 
   return (
-    <div className="page-container">
-      <h1 className="page-title">
-        <Inbox className="w-8 h-8 text-indigo-600" />
+    <div className="max-w-4xl mx-auto px-6 py-10 sm:px-8">
+      <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8">
         Exchange Requests
       </h1>
-      
-      <div className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Received Requests</h2>
-        {requests.received.length === 0 ? (
-          <div className="empty-state py-8">
-            <span className="empty-state-text text-sm">No received requests.</span>
-          </div>
-        ) : (
-          requests.received.map(req => <RequestCard key={req._id} req={req} isReceived={true} />)
-        )}
-      </div>
 
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Sent Requests</h2>
-        {requests.sent.length === 0 ? (
-          <div className="empty-state py-8">
-            <span className="empty-state-text text-sm">No sent requests.</span>
-          </div>
+      <section className="mb-10">
+        <h2 className="text-xs font-medium uppercase tracking-label text-brand-muted mb-4 pb-2 border-b border-black/[0.06]">
+          Received
+        </h2>
+        {requests.received.length === 0 ? (
+          <p className="text-sm text-brand-faint italic">No received requests.</p>
         ) : (
-          requests.sent.map(req => <RequestCard key={req._id} req={req} isReceived={false} />)
+          <div className="space-y-3">
+            {requests.received.map(req => (
+              <RequestCard key={req._id} req={req} isReceived={true} />
+            ))}
+          </div>
         )}
-      </div>
+      </section>
+
+      <section>
+        <h2 className="text-xs font-medium uppercase tracking-label text-brand-muted mb-4 pb-2 border-b border-black/[0.06]">
+          Sent
+        </h2>
+        {requests.sent.length === 0 ? (
+          <p className="text-sm text-brand-faint italic">No sent requests.</p>
+        ) : (
+          <div className="space-y-3">
+            {requests.sent.map(req => (
+              <RequestCard key={req._id} req={req} isReceived={false} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

@@ -10,21 +10,47 @@ const Home = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center flex-1 px-4 py-12 bg-slate-50">
-      <div className="max-w-3xl text-center">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 tracking-tight">
-          Exchange Skills, <span className="text-indigo-600">Empower Growth</span>
-        </h1>
-        <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-          Connect with people who want to learn what you know, and can teach you what you want to learn. A true peer-to-peer skill exchange platform.
+    <div className="flex flex-col items-center justify-center flex-1 px-6 py-24 bg-brand-bg">
+      <div className="max-w-2xl text-center">
+        {/* Eyebrow */}
+        <p className="text-xs uppercase tracking-label text-brand-muted mb-8 font-medium">
+          Peer-to-peer skill exchange
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link to="/signup" className="btn-primary w-full sm:w-auto text-lg px-8 py-3.5">
+
+        {/* Headline */}
+        <h1
+          className="text-5xl sm:text-6xl md:text-[64px] font-medium leading-[1.05] tracking-tighter text-brand-text mb-6"
+        >
+          Learn what you want.<br />Teach what you know.
+        </h1>
+
+        {/* Sub-headline */}
+        <p className="text-lg text-brand-muted leading-relaxed mb-10 max-w-lg mx-auto">
+          Connect with people who have the skills you need — and need the skills you have. Exchange knowledge, grow together.
+        </p>
+
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link to="/signup" className="btn-primary px-6 py-2.5 text-sm">
             Get Started
           </Link>
-          <Link to="/login" className="btn-secondary w-full sm:w-auto text-lg px-8 py-3.5">
-            Log in
+          <Link to="/login" className="btn-secondary px-6 py-2.5 text-sm">
+            Sign in
           </Link>
+        </div>
+      </div>
+
+      {/* Social proof strip */}
+      <div className="mt-20 text-center">
+        <p className="text-xs uppercase tracking-label text-brand-faint mb-6 font-medium">
+          Trusted by learners at
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-8 opacity-40">
+          {['Figma', 'Notion', 'Linear', 'Vercel', 'Stripe'].map((name) => (
+            <span key={name} className="text-sm font-semibold text-brand-muted tracking-tight">
+              {name}
+            </span>
+          ))}
         </div>
       </div>
     </div>
