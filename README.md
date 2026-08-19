@@ -1,50 +1,63 @@
 # Skill Exchange Platform
 
-> A peer-to-peer web application for matching users based on complementary skills and facilitating live video sessions with a collaborative whiteboard.
+> A peer-to-peer network matching users by complementary skills, offering live messaging and video sessions with a fully collaborative whiteboard to facilitate remote learning.
 
-This repository contains the full stack implementation of the Skill Exchange Platform, built as a capstone minimum viable product (MVP).
+![SkillEx Hero Image](./docs/screenshots/hero.png)
 
-## Problem Statement
-Finding people to trade skills with is difficult because matching complementary interests (what you can teach vs. what you want to learn) requires a specialized platform. This application solves that by deterministically matching users based on their listed skills, allowing them to send exchange requests, and providing a built-in, private WebRTC room to conduct the skill exchange session seamlessly without third-party apps.
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Express](https://img.shields.io/badge/Express.js-404D59?style=for-the-badge)
+![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![WebRTC](https://img.shields.io/badge/WebRTC-333333?style=for-the-badge&logo=webrtc&logoColor=white)
+
+## Why This Exists
+
+Finding a mentor or peer to trade skills with (e.g., teaching Spanish in exchange for learning JavaScript) is challenging because matching complementary interests requires a specialized platform. This application solves that by deterministically matching users based on the specific skills they can teach and want to learn. It provides end-to-end tooling to connect, chat, and jump into a private WebRTC video room equipped with a robust collaborative whiteboard—eliminating the need to juggle third-party messaging and video conferencing apps.
 
 ## Features
-* **Auth & Profiles**: Secure JWT-based authentication using HTTP-only cookies and bcrypt for password hashing. Users can manage their profiles and list skills they can teach or want to learn.
-* **Skill Matching**: A deterministic algorithm that calculates a match score between users based on complementary teach/learn skills.
-* **Exchange Requests**: Users can send, accept, and manage skill exchange requests from their matches.
-* **Live Video Room**: A private, one-to-one WebRTC video and audio room initialized once an exchange request is accepted.
-* **Collaborative Whiteboard**: A real-time synced canvas within the room for drawing and sharing ideas.
-* **Local Session Recording**: Built-in browser recording of the video session via the `MediaRecorder` API. The recording is saved locally to the user's machine as a WebM file (it is never uploaded to the backend).
+
+### Skill Matching & Discovery
+- **Profile Management:** Users can define specific skills they offer to teach and those they wish to learn.
+- **Deterministic Discovery:** The platform calculates a match score to find users whose needs and offerings directly complement yours.
+- **Connection Status:** Instantly see if you are already connected or have a pending exchange request with a candidate right on the discovery feed.
+
+### Connections & Messaging
+- **Exchange Requests:** Send requests to matches, and accept or reject incoming skill exchange requests.
+- **Real-Time Chat:** A dedicated messaging view for every accepted connection, synced via Socket.io.
+- **Conversation Cleanup:** Users can manually clear their message history or delete old/inactive exchange requests.
+- **Quick Video Access:** A shortcut in the chat UI allows jumping straight into a video room with your connection.
+
+### Live Video Sessions
+- **Peer-to-Peer Video/Audio:** One-to-one secure media streams powered by WebRTC.
+- **Hardware Management:** Camera and microphone access is explicitly requested only when turning them on, and cleanly released when turned off or upon exiting.
+- **Local Recording:** Native browser recording of the video session via the `MediaRecorder` API, downloaded directly to your machine.
+- **Full-Screen Mode:** Toggle full-screen for an immersive teaching experience.
+
+### Collaborative Whiteboard
+- **Synced Drawing Tools:** Freehand pen, object eraser, line, arrow, rectangle, circle, and text tools.
+- **Object-Based Canvas:** Every stroke and shape is stored as an object, allowing accurate hit-testing to erase specific elements without wiping the whole board.
+- **Robust Undo/Redo:** A per-user action history lets you undo/redo your own strokes and shapes without disrupting your peer's work.
+- **Image/Screenshot Import:** Drop images onto the board, move them around, or resize them.
+- **Recently Deleted Panel:** Restore accidentally deleted images, or permanently scrub them from the session for both participants.
+
+### Account & Privacy
+- **Secure Authentication:** JWT-based authentication via HTTP-only cookies and bcrypt password hashing.
+- **Account Deletion:** Users can permanently delete their accounts and wipe all associated data from the platform.
 
 ## Tech Stack
 
-| Component | Technology |
+| Layer | Technology |
 | --- | --- |
-| **Frontend** | React, React Router DOM, Tailwind CSS, Lucide React (Icons), Vite |
-| **Backend** | Node.js, Express.js |
+| **Frontend** | React 18, React Router DOM, Tailwind CSS, Lucide React, Vite |
+| **Backend** | Node.js, Express.js 5 |
 | **Database** | MongoDB Atlas, Mongoose |
-| **Realtime / Signaling** | Socket.io, Socket.io-client |
-| **Authentication** | JWT, bcrypt, express-validator, express-rate-limit |
-| **Media** | WebRTC, MediaRecorder API, HTML5 Canvas |
+| **Realtime** | Socket.io |
+| **Auth** | JWT, bcrypt, express-validator |
+| **Media** | WebRTC, HTML5 Canvas API |
 
 ## Architecture (Signaling & Realtime)
-The live room feature utilizes WebRTC for peer-to-peer video and audio streams. Because WebRTC requires peers to exchange connection metadata (offers, answers, and ICE candidates) before a direct connection can be established, **Socket.io** is used as the signaling server.
-- Media streams (audio and video) flow directly between the two users (peer-to-peer) and never pass through the Node.js backend.
-- The Socket.io connection is only used to relay signaling messages and synchronize the collaborative whiteboard strokes.
-- Room access is strictly authorized in the socket handler by validating the user's JWT against the participants of the associated `ExchangeRequest`.
 
-## Screenshots
-
-<!-- REPLACE THIS WITH A REAL SCREENSHOT OF THE DISCOVER PAGE -->
-![Discover page](./docs/screenshots/discover.png)
-
-<!-- REPLACE THIS WITH A REAL SCREENSHOT OF AN ACTIVE ROOM -->
-![Active Room](./docs/screenshots/room.png)
-
-<!-- REPLACE THIS WITH A REAL SCREENSHOT OF THE WHITEBOARD -->
-![Whiteboard](./docs/screenshots/whiteboard.png)
-
-<!-- REPLACE THIS WITH A REAL SCREENSHOT OF THE SESSION COMPLETE SCREEN -->
-![Session Complete](./docs/screenshots/session-complete.png)
+The live room feature utilizes WebRTC for direct, peer-to-peer video and audio streams. Because WebRTC requires peers to exchange connection metadata (offers, answers, and ICE candidates) before establishing a direct connection, **Socket.io** is used as the signaling server. This hybrid pattern means that media streams flow directly between the two users and never touch the Node.js backend, minimizing server bandwidth. The Socket.io connection is only used to relay signaling messages and reliably synchronize the collaborative whiteboard events.
 
 ## Getting Started
 
@@ -65,12 +78,12 @@ cd server
 npm install
 ```
 
-Create a `.env` file in the `server` directory based on the `.env.example`:
+Create a `.env` file based on `.env.example`:
 ```bash
 cp .env.example .env
 ```
 
-**Environment Variables (`server/.env`)**
+**Required Environment Variables (`server/.env`)**
 | Variable | Description | Example Value |
 | --- | --- | --- |
 | `PORT` | The port the backend runs on | `5000` |
@@ -87,7 +100,7 @@ npm install
 ```
 
 ### 4. Run the Development Servers
-In the `server` directory, start the Express backend:
+In the `server` directory, start the Express backend (runs with nodemon):
 ```bash
 npm run dev
 ```
@@ -98,28 +111,29 @@ npm run dev
 ```
 
 ### 5. Seed Demo Accounts (Optional)
-To quickly test the matching algorithm and room logic, you can seed two complementary demo accounts (Rahul and Arjun). From the `server` directory, run:
+To quickly test the matching algorithm, chat, and room logic, you can seed two complementary demo accounts (Rahul and Arjun). From the `server` directory, run:
 ```bash
 npm run seed:demo
 ```
-*You can then log in as `rahul@demo.com` and `arjun@demo.com` with the password `demo1234`.*
+*You can then log in on two separate browsers as `rahul@demo.com` and `arjun@demo.com` with the password `demo1234`.*
 
 ## Project Structure
+
 ```text
 skill-exchange-platform/
-├── client/                 # React frontend
+├── client/
 │   ├── src/
 │   │   ├── api/            # Axios instance
-│   │   ├── components/     # Reusable UI (Navbar, ProtectedRoute)
+│   │   ├── components/     # Reusable UI (Navbar, ChatPanel, etc.)
 │   │   ├── context/        # Auth Context
-│   │   └── pages/          # React views (Dashboard, Discover, Room, etc.)
+│   │   └── pages/          # React views (Dashboard, Discover, ChatView, Room, etc.)
 │   ├── package.json
 │   └── vite.config.js
-└── server/                 # Express backend
+└── server/
     ├── config/             # DB connection logic
     ├── middleware/         # Auth & validation middleware
-    ├── models/             # Mongoose schemas (User, Skill, Room, etc.)
-    ├── routes/             # REST API endpoints
+    ├── models/             # Mongoose schemas (User, ExchangeRequest, Message, etc.)
+    ├── routes/             # REST API endpoints (auth, discover, messages, etc.)
     ├── seeders/            # Database seeding scripts
     ├── socket/             # Socket.io handlers
     ├── package.json
@@ -127,10 +141,12 @@ skill-exchange-platform/
 ```
 
 ## Known Limitations
-* **TURN Server Missing**: The application relies on free Google STUN servers. If both peers are behind symmetric NATs or strict firewalls, the WebRTC connection may fail because a TURN server is not provided.
-* **No Group Calls**: The room architecture and WebRTC mesh are hardcoded for exactly two participants.
-* **No Cloud Recording**: Recordings rely purely on the browser's `MediaRecorder` API and are downloaded locally. If a browser crashes before the session ends, the recording is lost.
-* **Basic Matching Algorithm**: Matching is strictly deterministic and based on exact database skill matches; there is no AI or fuzzy semantic matching involved.
+
+- **TURN Server Missing:** The application relies on free STUN servers. If both peers are behind symmetric NATs or strict firewalls, the WebRTC connection may fail because a fallback TURN server is not provided.
+- **No Group Calls:** The room architecture and WebRTC mesh are currently hardcoded for exactly two participants.
+- **No Cloud Recording:** Recordings rely purely on the browser's `MediaRecorder` API and are downloaded locally. If a browser tab crashes before the session ends, the recording is lost.
+- **Basic Matching Algorithm:** Matching is strictly deterministic and based on exact database skill strings; there is no fuzzy semantic matching involved.
 
 ## License
+
 *No license is currently specified for this repository. Please consider adding an open-source license (such as MIT) if you plan to share this publicly.*
