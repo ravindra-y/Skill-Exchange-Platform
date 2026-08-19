@@ -199,4 +199,19 @@ router.get('/unread/counts', protect, async (req, res) => {
   }
 });
 
+// ─── DELETE /api/messages/:exchangeRequestId ───────────────────────────────
+// Delete all messages in a conversation (hard delete for both users).
+// @access Private
+router.delete('/:exchangeRequestId', protect, async (req, res) => {
+  try {
+    await assertParticipant(req.params.exchangeRequestId, req.user._id.toString());
+
+    await Message.deleteMany({ exchangeRequestId: req.params.exchangeRequestId });
+
+    res.json({ ok: true, message: 'Conversation deleted' });
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

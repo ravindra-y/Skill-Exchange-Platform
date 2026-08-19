@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from '../api/axios';
-import { UserPlus, Loader2 } from 'lucide-react';
+import { UserPlus, Loader2, MessageSquare } from 'lucide-react';
 
 const Discover = () => {
   const [matches, setMatches]             = useState([]);
@@ -60,7 +61,7 @@ const Discover = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {matches.map(({ user, score }) => (
+          {matches.map(({ user, score, existingRequest }) => (
             <div key={user._id} className="card card-body flex flex-col">
               {/* Header */}
               <div className="flex justify-between items-start mb-3">
@@ -84,24 +85,48 @@ const Discover = () => {
               </p>
 
               {/* CTA */}
-              <button
-                onClick={() => handleSendRequest(user._id)}
-                disabled={!!requestStatus[user._id]}
-                className={`w-full py-2 text-sm font-medium rounded-full flex items-center justify-center transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-brand-text ${
-                  requestStatus[user._id] === 'sent'
-                    ? 'bg-status-success text-white cursor-not-allowed'
-                    : requestStatus[user._id] === 'error'
-                    ? 'bg-[#fef2f2] text-status-error border border-[#fca5a5] cursor-not-allowed'
-                    : requestStatus[user._id] === 'sending'
-                    ? 'bg-brand-surface-2 text-brand-muted cursor-not-allowed'
-                    : 'bg-brand-text text-brand-bg hover:brightness-[1.08]'
-                }`}
-              >
-                {requestStatus[user._id] === 'sent'    && 'Request sent ✓'}
-                {requestStatus[user._id] === 'error'   && 'Failed — retry?'}
-                {requestStatus[user._id] === 'sending' && <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Sending…</>}
-                {!requestStatus[user._id]              && <><UserPlus className="w-4 h-4 mr-1.5" />Exchange skills</>}
-              </button>
+              {(() => {
+                if (existingRequest?.status === 'accepted') {
+                  return (
+                    <Link
+                      to={`/conversations/${existingRequest.id}`}
+                      className="w-full py-2 text-sm font-medium rounded-full flex items-center justify-center transition-all duration-150 bg-brand-surface-2 text-brand-text border border-black/[0.08] hover:bg-black/[0.02]"
+                    >
+                      <MessageSquare className="w-4 h-4 mr-1.5" />
+                      Connected
+                    </Link>
+                  );
+                }
+
+                if (existingRequest?.status === 'pending' || requestStatus[user._id] === 'sent') {
+                  return (
+                    <button
+                      disabled
+                      className="w-full py-2 text-sm font-medium rounded-full flex items-center justify-center bg-brand-surface-2 text-brand-muted cursor-not-allowed"
+                    >
+                      Request Pending
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    onClick={() => handleSendRequest(user._id)}
+                    disabled={!!requestStatus[user._id]}
+                    className={`w-full py-2 text-sm font-medium rounded-full flex items-center justify-center transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-brand-text ${
+                      requestStatus[user._id] === 'error'
+                        ? 'bg-[#fef2f2] text-status-error border border-[#fca5a5] cursor-not-allowed'
+                        : requestStatus[user._id] === 'sending'
+                        ? 'bg-brand-surface-2 text-brand-muted cursor-not-allowed'
+                        : 'bg-brand-text text-brand-bg hover:brightness-[1.08]'
+                    }`}
+                  >
+                    {requestStatus[user._id] === 'error'   && 'Failed — retry?'}
+                    {requestStatus[user._id] === 'sending' && <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Sending…</>}
+                    {!requestStatus[user._id]              && <><UserPlus className="w-4 h-4 mr-1.5" />Exchange skills</>}
+                  </button>
+                );
+              })()}
             </div>
           ))}
         </div>

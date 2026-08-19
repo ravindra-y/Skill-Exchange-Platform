@@ -5,14 +5,15 @@ import React, {
   useContext,
   useCallback,
 } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import api from '../api/axios';
-import { ArrowLeft, Send, Loader2, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, MessageSquare, Video, Trash2 } from 'lucide-react';
 
 export default function ChatView() {
   const { exchangeRequestId } = useParams();
+  const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const { socket: socketRef, joinChat, markRead, sendMessage } = useChat();
 
@@ -162,6 +163,18 @@ export default function ChatView() {
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
+  const handleDeleteChat = async () => {
+    if (!window.confirm('Are you sure you want to delete this conversation? This will delete all messages for both participants.')) {
+      return;
+    }
+    try {
+      await api.delete(`/messages/${exchangeRequestId}`);
+      navigate('/conversations');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete conversation');
+    }
+  };
+
   // ─── Render ───────────────────────────────────────────────────────────────
   if (initialLoading) return (
     <div className="flex items-center justify-center min-h-[calc(100vh-70px)] bg-brand-bg">
@@ -202,12 +215,28 @@ export default function ChatView() {
             {(partnerName || '?')[0].toUpperCase()}
           </span>
         </div>
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-medium text-brand-text leading-tight">{partnerName}</p>
           {typingUsers.size > 0 && (
             <p className="text-xs text-brand-muted animate-pulse">typing…</p>
           )}
         </div>
+        
+        {/* Actions */}
+        <button
+          onClick={() => navigate(`/room/${exchangeRequestId}`)}
+          title="Start Video Call"
+          className="p-1.5 text-brand-muted hover:text-brand-text transition-colors"
+        >
+          <Video className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleDeleteChat}
+          title="Delete Conversation"
+          className="p-1.5 text-brand-muted hover:text-status-error transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Message list */}

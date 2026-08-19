@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { Check, X, Video, Loader2 } from 'lucide-react';
+import { Check, X, Video, Loader2, Trash2 } from 'lucide-react';
 
 const Requests = () => {
   const { user } = useContext(AuthContext);
@@ -30,6 +30,16 @@ const Requests = () => {
       fetchRequests();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  const handleDeleteRequest = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this request from your history?')) return;
+    try {
+      await axios.delete(`/exchange/${id}`);
+      fetchRequests();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to delete request');
     }
   };
 
@@ -94,6 +104,14 @@ const Requests = () => {
             >
               <Video className="w-4 h-4" /> Enter Room
             </Link>
+          )}
+          {(req.status === 'rejected' || req.status === 'cancelled') && (
+            <button
+              onClick={() => handleDeleteRequest(req._id)}
+              className="flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-full border border-black/[0.08] text-brand-muted hover:text-status-error hover:bg-[#fef2f2] hover:border-[#fca5a5] flex items-center justify-center gap-1 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> Delete
+            </button>
           )}
         </div>
       </div>

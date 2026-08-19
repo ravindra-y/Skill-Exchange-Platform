@@ -94,14 +94,59 @@ module.exports = function setupSocket(io) {
     });
 
     // ─── Whiteboard sync ─────────────────────────────────────────────────
-    socket.on('draw', ({ roomId, stroke }) => {
+    socket.on('draw', ({ roomId, stroke, actionId, userId }) => {
       if (!roomId || socket.currentRoomId !== roomId) return;
-      socket.to(roomId).emit('draw', { stroke });
+      socket.to(roomId).emit('draw', { stroke, actionId, userId });
     });
 
-    socket.on('whiteboard-clear', ({ roomId }) => {
+    socket.on('draw-shape', ({ roomId, shape, actionId, userId }) => {
       if (!roomId || socket.currentRoomId !== roomId) return;
-      socket.to(roomId).emit('whiteboard-clear');
+      socket.to(roomId).emit('draw-shape', { shape, actionId, userId });
+    });
+
+    socket.on('draw-text', ({ roomId, textObj, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('draw-text', { textObj, actionId, userId });
+    });
+
+    socket.on('image-add', ({ roomId, image, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('image-add', { image, actionId, userId });
+    });
+
+    socket.on('image-update', ({ roomId, update, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('image-update', { update, actionId, userId });
+    });
+
+    socket.on('delete-image', ({ roomId, targetId, image, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('delete-image', { targetId, image, actionId, userId });
+    });
+
+    socket.on('whiteboard-undo', ({ roomId, actionId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('whiteboard-undo', { actionId });
+    });
+
+    socket.on('whiteboard-redo', ({ roomId, actionId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('whiteboard-redo', { actionId });
+    });
+
+    socket.on('whiteboard-clear', ({ roomId, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('whiteboard-clear', { actionId, userId });
+    });
+
+    socket.on('whiteboard-delete-element', ({ roomId, targetId, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('whiteboard-delete-element', { targetId, actionId, userId });
+    });
+
+    socket.on('whiteboard-permanent-delete', ({ roomId, targetId, actionId, userId }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('whiteboard-permanent-delete', { targetId, actionId, userId });
     });
 
     // ─── Leave / disconnect cleanup (video room) ──────────────────────────

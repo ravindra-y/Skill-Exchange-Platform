@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const UserSkill = require('../models/UserSkill');
+const ExchangeRequest = require('../models/ExchangeRequest');
 
 const router = express.Router();
 
@@ -48,11 +49,12 @@ router.get('/', protect, async (req, res) => {
 
     const matches = [];
 
+    // Fetch existing exchange requests involving the current user
+    const myRequests = await ExchangeRequest.find({
+      $or: [{ senderId: currentUserId }, { receiverId: currentUserId }]
+    });
+
     // 3. Compute matching algorithm for each user
-    // forwardMatch = (A's teach skills that B wants) / (A's teach skills count)
-    // reverseMatch = (B's teach skills that A wants) / (B's teach skills count)
-    // overallScore = ((forwardMatch + reverseMatch) / 2) * 100
-    // A = Current User, B = Other User
     for (const [uId, data] of Object.entries(usersMap)) {
       if (data.teach.length === 0 || data.learn.length === 0) continue;
 
@@ -78,10 +80,25 @@ router.get('/', protect, async (req, res) => {
         else if (overallScore >= 70) label = 'Good';
         else if (overallScore >= 40) label = 'Moderate';
 
+        // Check if there's an existing request
+        let existingRequest = null;
+        const reqDoc = myRequests.find(r => 
+          r.senderId.toString() === uId || r.receiverId.toString() === uId
+        );
+
+        if (reqDoc) {
+          existingRequest = {
+            id: reqDoc._id,
+            status: reqDoc.status,
+            direction: reqDoc.senderId.toString() === currentUserId.toString() ? 'sent' : 'received'
+          };
+        }
+
         matches.push({
           user: data.user,
           score: Math.round(overallScore),
-          label
+          label,
+          existingRequest
         });
       }
     }
