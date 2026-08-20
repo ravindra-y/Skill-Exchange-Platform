@@ -2,8 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Loader2, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 
 export default function BlogPost() {
@@ -107,10 +106,8 @@ export default function BlogPost() {
         </div>
       </div>
 
-      <div className="prose prose-slate max-w-none text-brand-text prose-a:text-blue-600 hover:prose-a:text-blue-500">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {post.content}
-        </ReactMarkdown>
+      <div className="mt-8">
+        <MarkdownRenderer content={post.content} />
       </div>
       
       {post.tags && post.tags.length > 0 && (

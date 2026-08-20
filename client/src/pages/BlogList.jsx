@@ -2,6 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import { Loader2, Plus, PenSquare } from 'lucide-react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+
+const generateExcerpt = (markdown) => {
+  if (!markdown) return '';
+  const rawHtml = marked.parse(markdown, { breaks: true, gfm: true });
+  const cleanHtml = DOMPurify.sanitize(rawHtml);
+  
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = cleanHtml;
+  const text = tempDiv.textContent || tempDiv.innerText || '';
+  
+  const trimmedText = text.replace(/\s+/g, ' ').trim();
+  if (trimmedText.length <= 200) return trimmedText;
+  
+  const lastSpace = trimmedText.lastIndexOf(' ', 200);
+  return trimmedText.substring(0, lastSpace > 0 ? lastSpace : 200) + '...';
+};
 
 export default function BlogList() {
   const [posts, setPosts] = useState([]);
@@ -73,7 +91,7 @@ export default function BlogList() {
                 {post.title}
               </h2>
               <p className="text-sm text-brand-muted mb-4 line-clamp-2">
-                {post.content.replace(/[#*`_]/g, '')}
+                {generateExcerpt(post.content)}
               </p>
               <div className="flex items-center justify-between text-xs text-brand-faint">
                 <span className="font-medium text-brand-muted">By {post.authorId?.name || 'Unknown'}</span>

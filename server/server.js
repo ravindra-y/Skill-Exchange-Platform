@@ -17,6 +17,8 @@ const exchangeRoutes = require('./routes/exchange');
 const roomRoutes     = require('./routes/rooms');
 const messagesRoutes = require('./routes/messages');
 const postsRoutes    = require('./routes/posts');
+const playlistRoutes = require('./routes/playlists');
+const progressRoutes = require('./routes/progress');
 
 const app    = express();
 const server = http.createServer(app);
@@ -51,14 +53,16 @@ setupSocket(io);
 app.set('io', io);
 
 // ─── REST routes ─────────────────────────────────────────────────────────────
-app.use('/api/auth',     authRoutes);
-app.use('/api/users',    userRoutes);
-app.use('/api/skills',   skillRoutes);
-app.use('/api/discover', discoverRoutes);
-app.use('/api/exchange', exchangeRoutes);
-app.use('/api/rooms',    roomRoutes);
-app.use('/api/messages', messagesRoutes);
-app.use('/api/posts',    postsRoutes);
+app.use('/api/auth',      authRoutes);
+app.use('/api/users',     userRoutes);
+app.use('/api/skills',    skillRoutes);
+app.use('/api/discover',  discoverRoutes);
+app.use('/api/exchange',  exchangeRoutes);
+app.use('/api/rooms',     roomRoutes);
+app.use('/api/messages',  messagesRoutes);
+app.use('/api/posts',     postsRoutes);
+app.use('/api/playlists', playlistRoutes);
+app.use('/api/progress',  progressRoutes);
 
 // ─── Error handler ───────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {

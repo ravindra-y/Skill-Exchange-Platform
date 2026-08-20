@@ -17,6 +17,9 @@ import ChatView from './pages/ChatView';
 import BlogList from './pages/BlogList';
 import BlogPost from './pages/BlogPost';
 import BlogEditor from './pages/BlogEditor';
+import PlaylistList from './pages/PlaylistList';
+import PlaylistView from './pages/PlaylistView';
+import PlaylistEditor from './pages/PlaylistEditor';
 
 function App() {
   return (
@@ -42,6 +45,11 @@ function App() {
                 <Route path="/blog/new"     element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
                 <Route path="/blog/:id"     element={<ProtectedRoute><BlogPost /></ProtectedRoute>} />
                 <Route path="/blog/:id/edit" element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
+
+                <Route path="/playlister"         element={<ProtectedRoute><PlaylistList /></ProtectedRoute>} />
+                <Route path="/playlister/new"     element={<ProtectedRoute><PlaylistEditor /></ProtectedRoute>} />
+                <Route path="/playlister/:id"     element={<ProtectedRoute><PlaylistView /></ProtectedRoute>} />
+                <Route path="/playlister/:id/edit" element={<ProtectedRoute><PlaylistEditor /></ProtectedRoute>} />
               </Routes>
             </main>
           </div>

@@ -30,11 +30,12 @@ const Navbar = () => {
   };
 
   const navLinks = user ? [
-    { name: 'Discover',  to: '/discover' },
-    { name: 'Requests',  to: '/requests' },
-    { name: 'Messages',  to: '/conversations', badge: totalUnread },
-    { name: 'Blog',      to: '/blog' },
-    { name: 'Profile',   to: '/dashboard' },
+    { name: 'Discover',   to: '/discover' },
+    { name: 'Requests',   to: '/requests' },
+    { name: 'Messages',   to: '/conversations', badge: totalUnread },
+    { name: 'Blog',       to: '/blog' },
+    { name: 'Playlister', to: '/playlister' },
+    { name: 'Profile',    to: '/dashboard' },
   ] : [];
 
   const isActive = (path) => location.pathname === path;

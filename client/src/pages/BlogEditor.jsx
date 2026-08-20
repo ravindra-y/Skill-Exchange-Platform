@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { Loader2, ArrowLeft, Eye, Edit3 } from 'lucide-react';
 
 export default function BlogEditor() {
@@ -70,7 +69,7 @@ export default function BlogEditor() {
   );
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-6 py-8 sm:px-8 h-[calc(100vh-70px)] flex flex-col">
+    <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-6 h-[calc(100vh-80px)] flex flex-col">
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div className="flex items-center gap-4">
           <Link to={isEditing ? `/blog/${id}` : '/blog'} className="text-brand-muted hover:text-brand-text transition-colors">
@@ -101,7 +100,7 @@ export default function BlogEditor() {
              <button onClick={() => setActiveTab('preview')} className={`flex-1 py-1.5 text-sm font-medium rounded-md ${activeTab === 'preview' ? 'bg-black/[0.04] text-brand-text' : 'text-brand-muted'}`}>Preview</button>
           </div>
 
-          <div className="flex-1 flex flex-col gap-4 bg-brand-bg md:bg-transparent">
+          <div className="flex-1 flex flex-col min-h-0 gap-4 bg-brand-bg md:bg-transparent">
             <input
               type="text"
               placeholder="Post Title"
@@ -131,12 +130,10 @@ export default function BlogEditor() {
             <Eye className="w-4 h-4 text-brand-muted mr-2" />
             <span className="text-sm font-medium text-brand-muted">Preview</span>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-6 prose prose-slate prose-sm max-w-none prose-a:text-blue-600">
-            {title && <h1 className="mb-6">{title}</h1>}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            {title && <h1 className="mb-6 text-3xl font-bold">{title}</h1>}
             {content ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {content}
-              </ReactMarkdown>
+              <MarkdownRenderer content={content} />
             ) : (
               <p className="text-brand-faint italic">Preview will appear here...</p>
             )}
