@@ -184,7 +184,7 @@ export default function ChatView() {
   );
 
   if (fetchError) return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
+    <div className="w-full max-w-2xl mx-auto px-6 py-10">
       <div className="px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">
         {fetchError}
       </div>
@@ -240,9 +240,9 @@ export default function ChatView() {
       </div>
 
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
         {hasMore && (
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-4 mt-2">
             <button
               onClick={loadMore}
               disabled={loadingMore}
@@ -263,12 +263,12 @@ export default function ChatView() {
           </div>
         )}
 
-        {grouped.map(item => {
+        {grouped.map((item, index) => {
           if (item.type === 'date') {
             return (
-              <div key={item.key} className="flex items-center gap-3 py-2">
+              <div key={item.key} className="flex items-center gap-3 py-4 mt-2">
                 <div className="flex-1 h-px bg-brand-line/40" />
-                <span className="text-xs text-brand-faint shrink-0">{item.label}</span>
+                <span className="text-[11px] font-medium text-brand-faint uppercase tracking-wider shrink-0">{item.label}</span>
                 <div className="flex-1 h-px bg-brand-line/40" />
               </div>
             );
@@ -278,22 +278,34 @@ export default function ChatView() {
           const senderId = msg.senderId?._id || msg.senderId;
           const isMe = senderId === user?._id;
 
+          const prevItem = index > 0 ? grouped[index - 1] : null;
+          const prevSenderId = prevItem?.type === 'msg' ? (prevItem.msg.senderId?._id || prevItem.msg.senderId) : null;
+          const isSameSenderAsPrev = prevSenderId === senderId;
+
+          const nextItem = index < grouped.length - 1 ? grouped[index + 1] : null;
+          const nextSenderId = nextItem?.type === 'msg' ? (nextItem.msg.senderId?._id || nextItem.msg.senderId) : null;
+          const isSameSenderAsNext = nextSenderId === senderId;
+
+          const marginTop = isSameSenderAsPrev ? 'mt-1' : 'mt-5';
+
           return (
             <div
               key={item.key}
-              className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}
+              className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${marginTop}`}
             >
               <div
-                className={`max-w-[75%] px-4 py-2 rounded-[8px] text-sm leading-relaxed ${
+                className={`max-w-[85%] md:max-w-[65%] px-4 py-2.5 rounded-[12px] text-sm leading-relaxed ${
                   isMe
-                    ? 'bg-brand-text text-brand-bg rounded-br-sm'
-                    : 'bg-brand-surface border border-black/[0.08] text-brand-text rounded-bl-sm'
+                    ? `bg-brand-text text-brand-bg ${isSameSenderAsNext ? 'rounded-br-[4px]' : 'rounded-br-[12px]'} ${isSameSenderAsPrev ? 'rounded-tr-[4px]' : 'rounded-tr-[12px]'}`
+                    : `bg-brand-surface border border-black/[0.08] text-brand-text shadow-sm ${isSameSenderAsNext ? 'rounded-bl-[4px]' : 'rounded-bl-[12px]'} ${isSameSenderAsPrev ? 'rounded-tl-[4px]' : 'rounded-tl-[12px]'}`
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                <p className={`text-xs mt-1 text-right ${isMe ? 'text-brand-bg/50' : 'text-brand-faint'}`}>
-                  {formatTime(msg.createdAt)}
-                </p>
+                {!isSameSenderAsNext && (
+                  <p className={`text-[10px] mt-1.5 text-right font-medium tracking-tight ${isMe ? 'text-brand-bg/50' : 'text-brand-faint'}`}>
+                    {formatTime(msg.createdAt)}
+                  </p>
+                )}
               </div>
             </div>
           );

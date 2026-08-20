@@ -14,6 +14,9 @@ import Requests from './pages/Requests';
 import Room from './pages/Room';
 import Conversations from './pages/Conversations';
 import ChatView from './pages/ChatView';
+import BlogList from './pages/BlogList';
+import BlogPost from './pages/BlogPost';
+import BlogEditor from './pages/BlogEditor';
 
 function App() {
   return (
@@ -34,6 +37,11 @@ function App() {
                 <Route path="/room/:id"     element={<ProtectedRoute><Room /></ProtectedRoute>} />
                 <Route path="/conversations"         element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
                 <Route path="/conversations/:exchangeRequestId" element={<ProtectedRoute><ChatView /></ProtectedRoute>} />
+                
+                <Route path="/blog"         element={<ProtectedRoute><BlogList /></ProtectedRoute>} />
+                <Route path="/blog/new"     element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
+                <Route path="/blog/:id"     element={<ProtectedRoute><BlogPost /></ProtectedRoute>} />
+                <Route path="/blog/:id/edit" element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
               </Routes>
             </main>
           </div>

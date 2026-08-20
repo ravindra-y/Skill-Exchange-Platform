@@ -33,6 +33,7 @@ const Navbar = () => {
     { name: 'Discover',  to: '/discover' },
     { name: 'Requests',  to: '/requests' },
     { name: 'Messages',  to: '/conversations', badge: totalUnread },
+    { name: 'Blog',      to: '/blog' },
     { name: 'Profile',   to: '/dashboard' },
   ] : [];
 

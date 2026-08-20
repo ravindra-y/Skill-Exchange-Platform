@@ -109,7 +109,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-10 sm:px-8">
+    <div className="w-full max-w-4xl mx-auto px-6 py-10 sm:px-8">
 
       <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8">Profile</h1>
 

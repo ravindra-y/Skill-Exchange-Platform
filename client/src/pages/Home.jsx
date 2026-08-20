@@ -11,7 +11,7 @@ const Home = () => {
 
   return (
     <div className="flex flex-col items-center justify-center flex-1 px-6 py-24 bg-brand-bg">
-      <div className="max-w-2xl text-center">
+      <div className="w-full max-w-2xl text-center">
         {/* Eyebrow */}
         <p className="text-xs uppercase tracking-label text-brand-muted mb-8 font-medium">
           Peer-to-peer skill exchange

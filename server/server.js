@@ -16,6 +16,7 @@ const discoverRoutes = require('./routes/discover');
 const exchangeRoutes = require('./routes/exchange');
 const roomRoutes     = require('./routes/rooms');
 const messagesRoutes = require('./routes/messages');
+const postsRoutes    = require('./routes/posts');
 
 const app    = express();
 const server = http.createServer(app);
@@ -57,6 +58,7 @@ app.use('/api/discover', discoverRoutes);
 app.use('/api/exchange', exchangeRoutes);
 app.use('/api/rooms',    roomRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/posts',    postsRoutes);
 
 // ─── Error handler ───────────────────────────────────────────────────────────
 app.use((err, req, res, next) => {

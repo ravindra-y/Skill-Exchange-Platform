@@ -42,7 +42,7 @@ const Discover = () => {
   );
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10 sm:px-8">
+    <div className="w-full max-w-5xl mx-auto px-6 py-10 sm:px-8">
       <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-1">Discover</h1>
       <p className="text-sm text-brand-muted mb-8">
         Find people who can teach what you want to learn — and need what you can teach.

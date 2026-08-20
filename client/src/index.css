@@ -74,7 +74,7 @@
 
   /* ── Layout ───────────────────────────────────────────────────────────── */
   .page-container {
-    @apply max-w-5xl mx-auto px-6 py-10 sm:px-8 lg:px-10;
+    @apply w-full max-w-5xl mx-auto px-6 py-10 sm:px-8 lg:px-10;
   }
 
   /* ── Card / Surface ───────────────────────────────────────────────────── */
@@ -108,6 +108,6 @@
 
   .empty-card {
     @apply bg-brand-surface border border-black/[0.08] rounded-[8px]
-           py-16 text-center;
+           py-16 px-6 text-center;
   }
 }

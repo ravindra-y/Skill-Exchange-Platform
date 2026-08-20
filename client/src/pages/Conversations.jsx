@@ -44,13 +44,13 @@ export default function Conversations() {
   );
 
   if (error) return (
-    <div className="max-w-2xl mx-auto px-6 py-10">
+    <div className="w-full max-w-2xl mx-auto px-6 py-10">
       <div className="px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">{error}</div>
     </div>
   );
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-10 sm:px-8">
+    <div className="w-full max-w-2xl mx-auto px-6 py-10 sm:px-8">
       <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8 flex items-center gap-3">
         Messages
       </h1>
