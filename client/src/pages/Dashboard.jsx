@@ -13,10 +13,16 @@ const Dashboard = () => {
   const [skills, setSkills]         = useState([]);
   const [allSkills, setAllSkills]   = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [selectedSkill, setSelectedSkill] = useState('');
   const [skillType, setSkillType]   = useState('teach');
   const [pageError, setPageError]   = useState('');
   const [saving, setSaving]         = useState(false);
+
+  // Skill Search State
+  const [skillSearch, setSkillSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredSkills, setFilteredSkills] = useState([]);
+  const [suggestedSkills, setSuggestedSkills] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Profile edit state
   const [isEditing, setIsEditing]   = useState(false);
@@ -61,13 +67,67 @@ const Dashboard = () => {
     }
   };
 
-  const handleAddSkill = async (e) => {
-    e.preventDefault();
-    if (!selectedSkill) return;
+  useEffect(() => {
+    if (skillSearch.trim().length < 2) {
+      setFilteredSkills([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const controller = new AbortController();
+
+    const fetchSkills = async () => {
+      try {
+        const res = await axios.get(`/skills/search?q=${encodeURIComponent(skillSearch)}`, {
+          signal: controller.signal
+        });
+        
+        // Filter out skills the user already has
+        const results = res.data.filter(
+          s => !skills.some(userSkill => userSkill.skillId?.name?.toLowerCase() === s.name.toLowerCase())
+        );
+        
+        setFilteredSkills(results);
+      } catch (error) {
+        if (!axios.isCancel(error)) {
+          console.error('Skill search error:', error);
+          setFilteredSkills([]);
+        }
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const delayDebounce = setTimeout(() => {
+      fetchSkills();
+    }, 300);
+
+    return () => {
+      clearTimeout(delayDebounce);
+      controller.abort();
+    };
+  }, [skillSearch, skills]);
+
+  useEffect(() => {
+    const availableSkills = allSkills.filter(s => 
+      !skills.some(userSkill => userSkill.skillId?._id === s._id || userSkill.skillId?.name === s.name)
+    );
+    // Suggest some random or first 5 skills
+    setSuggestedSkills(availableSkills.slice(0, 5));
+  }, [allSkills, skills]);
+
+  const handleAddSkill = async (skillObj) => {
     setPageError('');
     try {
-      await axios.post('/users/skills', { skillId: selectedSkill, type: skillType });
-      setSelectedSkill('');
+      // 1. Ensure the skill exists in our DB (since ESCO skills only have a URI initially)
+      const res = await axios.post('/skills', { name: skillObj.name });
+      const finalSkillId = res.data._id;
+      
+      // 2. Add to user skills
+      await axios.post('/users/skills', { skillId: finalSkillId, type: skillType });
+      
+      // Refresh user skills
       fetchData();
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to add skill.');
@@ -233,24 +293,63 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Add Skill Form */}
-      <div className="card card-body mb-6">
+      {/* Add Skill Form with Search & Suggestions */}
+      <div className="card card-body mb-6 relative">
         <h3 className="text-sm font-medium text-brand-text mb-4">Add a skill</h3>
-        <form onSubmit={handleAddSkill} className="flex flex-col sm:flex-row gap-3 items-end">
-          <div className="flex-1 w-full">
+        <div className="flex flex-col sm:flex-row gap-3 items-start">
+          <div className="flex-1 w-full relative">
             <label className="input-label">Skill</label>
-            <select
-              required
-              value={selectedSkill}
-              onChange={(e) => setSelectedSkill(e.target.value)}
-              className="input-field"
-            >
-              <option value="">— Select a skill —</option>
-              {allSkills.map(s => (
-                <option key={s._id} value={s._id}>{s.name} ({s.category})</option>
-              ))}
-            </select>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-brand-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Skill (ex: Project Management)"
+                value={skillSearch}
+                onChange={(e) => {
+                  setSkillSearch(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                className="input-field pl-10"
+              />
+            </div>
+            
+            {/* Search Suggestions Dropdown */}
+            {showSuggestions && skillSearch.trim().length >= 2 && (
+              <div className="absolute z-10 mt-1 w-full bg-brand-surface border border-black/[0.08] rounded-[8px] shadow-lg max-h-60 overflow-y-auto">
+                {isSearching ? (
+                  <div className="px-4 py-3 text-sm text-brand-muted flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Searching...
+                  </div>
+                ) : filteredSkills.length > 0 ? (
+                  <ul className="py-1">
+                    {filteredSkills.map(s => (
+                      <li
+                        key={s.id || s._id}
+                        className="px-4 py-2 hover:bg-brand-surface-2 cursor-pointer text-sm text-brand-text transition-colors"
+                        onClick={() => {
+                          handleAddSkill(s);
+                          setSkillSearch('');
+                          setShowSuggestions(false);
+                        }}
+                      >
+                        {s.name} {s.category && <span className="text-brand-faint text-xs ml-2">({s.category})</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="px-4 py-3 text-sm text-brand-muted">
+                    No skills found. Try a different search.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+          
           <div className="w-full sm:w-44">
             <label className="input-label">Type</label>
             <select
@@ -262,10 +361,25 @@ const Dashboard = () => {
               <option value="learn">I want to learn</option>
             </select>
           </div>
-          <button type="submit" className="btn-primary w-full sm:w-auto shrink-0">
-            <Plus className="w-4 h-4" /> Add
-          </button>
-        </form>
+        </div>
+
+        {/* Suggested Skills Chips */}
+        {suggestedSkills.length > 0 && (
+          <div className="mt-5">
+            <h4 className="text-sm font-medium text-brand-text mb-3">Suggested based on your profile</h4>
+            <div className="flex flex-wrap gap-2">
+              {suggestedSkills.map(s => (
+                <button
+                  key={s._id}
+                  onClick={() => handleAddSkill(s)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-black/[0.08] hover:border-black/[0.16] hover:bg-brand-surface-2 transition-colors text-sm text-brand-text"
+                >
+                  {s.name} <Plus className="w-3.5 h-3.5 text-brand-muted" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Danger Zone */}

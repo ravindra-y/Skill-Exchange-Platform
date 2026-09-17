@@ -28,8 +28,6 @@ export default function PlaylistView() {
   const iframeContainerRef = useRef(null);
   const pipWindowRef = useRef(null);
   const [isPipActive, setIsPipActive] = useState(false);
-  const [pipFallbackVisible, setPipFallbackVisible] = useState(false);
-  const [extensionDetected, setExtensionDetected] = useState(false);
 
   // Playback Progress state
   const ytPlayerRef = useRef(null);
@@ -92,21 +90,6 @@ export default function PlaylistView() {
       console.error('Failed to save progress', err);
     }
   };
-
-  // Best-effort check for Google's PiP Chrome Extension
-  useEffect(() => {
-    const checkExtension = async () => {
-      try {
-        // This fetch will only succeed if the extension explicitly exposes manifest.json via web_accessible_resources
-        const res = await fetch('chrome-extension://hkgfoiooedgoejojocmhlaklaeopbecg/manifest.json', { method: 'HEAD' });
-        if (res.ok) setExtensionDetected(true);
-      } catch (err) {
-        // Expected behavior for most setups (blocked by CORS/browser security). Treat as unknown.
-        setExtensionDetected(false);
-      }
-    };
-    checkExtension();
-  }, []);
 
   useEffect(() => {
     const fetchPlaylist = async () => {
@@ -177,7 +160,6 @@ export default function PlaylistView() {
       // Reset iframe state for the new video
       setIframeLoaded(false);
       setIframeError(false);
-      setPipFallbackVisible(false);
       
       // Move focus to the close button inside the modal
       const closeBtn = document.getElementById('modal-close-btn');
@@ -280,47 +262,8 @@ export default function PlaylistView() {
     }
   }, [activeVideo]);
 
-  const handlePiP = async () => {
-    if (typeof window !== 'undefined' && 'documentPictureInPicture' in window) {
-      try {
-        const pipWindow = await window.documentPictureInPicture.requestWindow({
-          width: 640,
-          height: 360,
-        });
-        pipWindowRef.current = pipWindow;
-        
-        // Copy styles to pip window to ensure iframe stretches
-        const style = pipWindow.document.createElement('style');
-        style.textContent = `
-          body { margin: 0; padding: 0; background: black; overflow: hidden; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-          iframe { width: 100%; height: 100%; border: none; }
-        `;
-        pipWindow.document.head.appendChild(style);
-        
-        // Move iframe to PiP
-        if (iframeRef.current) {
-          pipWindow.document.body.appendChild(iframeRef.current);
-          setIsPipActive(true);
-        }
-        
-        pipWindow.addEventListener('pagehide', () => {
-          // Move iframe back
-          if (iframeContainerRef.current && iframeRef.current) {
-            iframeContainerRef.current.appendChild(iframeRef.current);
-          }
-          pipWindowRef.current = null;
-          setIsPipActive(false);
-        });
-        
-        return; // Successfully entered PiP, exit early
-      } catch (err) {
-        console.error('Failed to enter Document PiP:', err);
-        // Fall through to show the fallback panel
-      }
-    }
-    
-    // If native PiP is unsupported or failed, show the fallback tooltip
-    setPipFallbackVisible(true);
+  const handlePiP = () => {
+    setIsPipActive(!isPipActive);
   };
 
   if (loading) return (
@@ -458,70 +401,40 @@ export default function PlaylistView() {
       {/* Video Modal / Lightbox */}
       {activeVideo && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 sm:p-8 backdrop-blur-sm"
-          onClick={() => setActiveVideo(null)}
+          className={
+            isPipActive
+              ? "fixed bottom-6 right-6 z-50 flex items-center justify-center w-80 shadow-2xl transition-all duration-300 pointer-events-auto"
+              : "fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 sm:p-8 backdrop-blur-sm transition-all duration-300"
+          }
+          onClick={isPipActive ? undefined : () => setActiveVideo(null)}
         >
           {/* PiP Button */}
           {iframeLoaded && !iframeError && (
-            <div className="absolute top-4 right-16 z-50">
+            <div className={`absolute z-50 ${isPipActive ? 'top-2 right-12 scale-75' : 'top-4 right-16'}`}>
               <button 
                 onClick={(e) => { e.stopPropagation(); handlePiP(); }}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
-                aria-label="Picture-in-Picture"
-                title="Picture-in-Picture"
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 border border-white/10"
+                aria-label="Toggle Picture-in-Picture"
+                title="Toggle Picture-in-Picture"
               >
                 <PictureInPicture className="w-5 h-5" aria-hidden="true" />
               </button>
-
-              {/* PiP Fallback Panel */}
-              {pipFallbackVisible && (
-                <div 
-                  className="absolute top-12 right-0 w-72 bg-[#1e1e1e] border border-white/10 rounded-[12px] shadow-2xl p-4 text-left z-50 mt-2 origin-top-right transition-all"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <button 
-                    onClick={() => setPipFallbackVisible(false)}
-                    className="absolute top-2 right-2 text-white/50 hover:text-white transition-colors"
-                    aria-label="Close message"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <p className="text-sm text-white font-medium mb-2 pr-4">
-                    Native Picture-in-Picture isn't available for this video in your browser.
-                  </p>
-                  
-                  {!extensionDetected && (
-                    <a 
-                      href="https://chromewebstore.google.com/detail/picture-in-picture-extens/hkgfoiooedgoejojocmhlaklaeopbecg"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-sm text-blue-400 hover:text-blue-300 underline mb-3"
-                    >
-                      Get the Picture-in-Picture extension
-                    </a>
-                  )}
-                  
-                  <p className="text-xs text-white/70 bg-white/5 p-2 rounded-[8px]">
-                    If you already have it, press <kbd className="font-sans px-1 rounded bg-black/50 border border-white/20">Alt+P</kbd> (or <kbd className="font-sans px-1 rounded bg-black/50 border border-white/20">⌥+P</kbd> on Mac) or click its icon in your toolbar while the video is playing.
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
           <button 
             id="modal-close-btn"
-            onClick={() => setActiveVideo(null)}
-            className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+            onClick={(e) => { e.stopPropagation(); setActiveVideo(null); setIsPipActive(false); }}
+            className={`absolute z-50 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 border border-white/10 ${isPipActive ? 'top-2 right-2 w-8 h-8 scale-75' : 'top-4 right-4 w-10 h-10'}`}
             aria-label="Close viewer"
             title="Close viewer"
           >
-            <X className="w-6 h-6" aria-hidden="true" />
+            <X className={isPipActive ? "w-4 h-4" : "w-6 h-6"} aria-hidden="true" />
           </button>
           
           <div 
             ref={iframeContainerRef}
-            className="relative w-full max-w-6xl aspect-video bg-black rounded-[12px] overflow-hidden shadow-2xl ring-1 ring-white/10 flex items-center justify-center" 
+            className={`relative w-full max-w-6xl aspect-video bg-black rounded-[12px] overflow-hidden shadow-2xl ring-1 ring-white/10 flex items-center justify-center ${isPipActive ? 'group' : ''}`} 
             onClick={e => e.stopPropagation()}
           >
             {isPipActive && (
