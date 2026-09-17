@@ -44,6 +44,9 @@ const skillValidation = [
     .custom(val => mongoose.Types.ObjectId.isValid(val)).withMessage('Invalid skillId'),
   body('type')
     .isIn(['teach', 'learn']).withMessage('type must be "teach" or "learn"'),
+  body('level')
+    .optional()
+    .isIn(['Beginner', 'Intermediate', 'Expert']).withMessage('Invalid level'),
 ];
 
 // @route   PUT /api/users/profile
@@ -95,7 +98,7 @@ router.post('/skills', protect, skillValidation, async (req, res) => {
     return res.status(400).json({ message: errors.array()[0].msg });
   }
 
-  const { skillId, type } = req.body;
+  const { skillId, type, level } = req.body;
 
   try {
     const existing = await UserSkill.findOne({ userId: req.user._id, skillId, type });
@@ -103,7 +106,10 @@ router.post('/skills', protect, skillValidation, async (req, res) => {
       return res.status(400).json({ message: `Skill already added to ${type} list` });
     }
 
-    const userSkill = await UserSkill.create({ userId: req.user._id, skillId, type });
+    const skillData = { userId: req.user._id, skillId, type };
+    if (level) skillData.level = level;
+
+    const userSkill = await UserSkill.create(skillData);
     const populated = await userSkill.populate('skillId');
     res.status(201).json(populated);
   } catch (error) {

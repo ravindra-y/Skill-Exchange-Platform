@@ -16,6 +16,12 @@ const userSkillSchema = new mongoose.Schema({
     enum: ['teach', 'learn'],
     required: true,
   },
+  level: {
+    type: String,
+    enum: ['Beginner', 'Intermediate', 'Expert'],
+    required: true,
+    default: 'Beginner',
+  }
 });
 
 userSkillSchema.index({ userId: 1, skillId: 1, type: 1 }, { unique: true });

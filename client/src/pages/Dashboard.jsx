@@ -58,6 +58,7 @@ const Dashboard = () => {
 
   // ── Skill state ──
   const [skillType, setSkillType]   = useState('teach');
+  const [skillLevel, setSkillLevel] = useState('Beginner');
   const [skillSearch, setSkillSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredSkills, setFilteredSkills]   = useState([]);
@@ -266,7 +267,7 @@ const Dashboard = () => {
     try {
       const res = await axios.post('/skills', { name: skillObj.name });
       const finalSkillId = res.data._id;
-      await axios.post('/users/skills', { skillId: finalSkillId, type: skillType });
+      await axios.post('/users/skills', { skillId: finalSkillId, type: skillType, level: skillLevel });
       fetchData();
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to add skill.');
@@ -536,7 +537,12 @@ const Dashboard = () => {
                   key={skill._id}
                   className="flex justify-between items-center px-3 py-2 bg-brand-surface-2 rounded-[8px]"
                 >
-                  <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-brand-surface border border-black/[0.08] text-brand-muted rounded-full">
+                      {skill.level || 'Beginner'}
+                    </span>
+                  </div>
                   <button
                     onClick={() => handleRemoveSkill(skill._id)}
                     className="text-brand-faint hover:text-status-error transition-colors p-1"
@@ -564,7 +570,12 @@ const Dashboard = () => {
                   key={skill._id}
                   className="flex justify-between items-center px-3 py-2 bg-brand-surface-2 rounded-[8px]"
                 >
-                  <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 bg-brand-surface border border-black/[0.08] text-brand-muted rounded-full">
+                      {skill.level || 'Beginner'}
+                    </span>
+                  </div>
                   <button
                     onClick={() => handleRemoveSkill(skill._id)}
                     className="text-brand-faint hover:text-status-error transition-colors p-1"
@@ -641,6 +652,19 @@ const Dashboard = () => {
             >
               <option value="teach">I can teach</option>
               <option value="learn">I want to learn</option>
+            </select>
+          </div>
+
+          <div className="w-full sm:w-44">
+            <label className="input-label">Proficiency Level</label>
+            <select
+              value={skillLevel}
+              onChange={e => setSkillLevel(e.target.value)}
+              className="input-field"
+            >
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Expert">Expert</option>
             </select>
           </div>
         </div>
