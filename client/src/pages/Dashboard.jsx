@@ -3,7 +3,7 @@ import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import {
   Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X,
-  Camera, CheckCircle2, Pencil, Github, Linkedin, Globe
+  Camera, CheckCircle2, Pencil, Github, Linkedin, Globe, Star
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
@@ -41,6 +41,7 @@ const Dashboard = () => {
   // ── Data state ──
   const [skills, setSkills]         = useState([]);
   const [allSkills, setAllSkills]   = useState([]);
+  const [reviewsData, setReviewsData] = useState({ reviews: [], averageRating: 0, totalReviews: 0, hoursTaught: 0 });
   const [loading, setLoading]       = useState(true);
   const [pageError, setPageError]   = useState('');
 
@@ -79,12 +80,14 @@ const Dashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [userSkillsRes, allSkillsRes] = await Promise.all([
+      const [userSkillsRes, allSkillsRes, reviewsRes] = await Promise.all([
         axios.get('/users/skills'),
         axios.get('/skills'),
+        axios.get('/users/reviews'),
       ]);
       setSkills(userSkillsRes.data);
       setAllSkills(allSkillsRes.data);
+      setReviewsData(reviewsRes.data);
     } catch {
       setPageError('Failed to load skills. Please refresh the page.');
     } finally {
@@ -792,6 +795,64 @@ const Dashboard = () => {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Reviews & Feedback ───────────────────────────────────────────── */}
+      <div className="card card-body mb-6">
+        <h3 className="text-sm font-medium text-brand-text mb-4 pb-3 border-b border-black/[0.06]">
+          Reviews & Feedback
+        </h3>
+        
+        <div className="flex flex-col sm:flex-row gap-6 mb-6">
+          <div className="flex-1 bg-brand-surface-2 border border-black/[0.08] rounded-[8px] p-4 flex flex-col items-center justify-center text-center">
+            <div className="flex items-center justify-center gap-1.5 text-2xl font-semibold text-brand-text mb-1">
+              <Star className="w-5 h-5 fill-brand-text" />
+              {reviewsData.averageRating > 0 ? reviewsData.averageRating : 'N/A'} <span className="text-sm font-normal text-brand-muted">/ 5.0</span>
+            </div>
+            <p className="text-xs text-brand-muted">Based on {reviewsData.totalReviews} review{reviewsData.totalReviews !== 1 && 's'}</p>
+          </div>
+          <div className="flex-1 bg-brand-surface-2 border border-black/[0.08] rounded-[8px] p-4 flex flex-col items-center justify-center text-center">
+            <div className="text-2xl font-semibold text-brand-text mb-1">
+              {reviewsData.hoursTaught} <span className="text-sm font-normal text-brand-muted">hours</span>
+            </div>
+            <p className="text-xs text-brand-muted">Total taught</p>
+          </div>
+        </div>
+
+        {reviewsData.reviews.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-brand-muted">No session reviews yet</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {reviewsData.reviews.map(review => (
+              <div key={review._id} className="p-4 border border-black/[0.08] rounded-[8px] flex items-start gap-3">
+                {review.reviewerId?.avatarUrl ? (
+                  <img src={review.reviewerId.avatarUrl} alt={review.reviewerId.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
+                ) : (
+                  <AvatarPlaceholder name={review.reviewerId?.name} size={40} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                    <div>
+                      <h4 className="text-sm font-medium text-brand-text">{review.reviewerId?.name}</h4>
+                      <p className="text-[11px] text-brand-muted">Learned {review.skillId?.name}</p>
+                    </div>
+                    <span className="text-[10px] text-brand-faint">{new Date(review.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-0.5 mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-brand-text text-brand-text' : 'fill-none text-black/[0.12]'}`} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-brand-text leading-relaxed">
+                    {review.comment}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

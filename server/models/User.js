@@ -42,6 +42,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
   },
+  hoursTaught: {
+    type: Number,
+    default: 0,
+  }
 }, {
   timestamps: true,
 });

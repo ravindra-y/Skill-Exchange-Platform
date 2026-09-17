@@ -7,6 +7,7 @@ const ExchangeRequest = require('../models/ExchangeRequest');
 const Message = require('../models/Message');
 const Room = require('../models/Room');
 const RoomParticipant = require('../models/RoomParticipant');
+const Review = require('../models/Review');
 const mongoose = require('mongoose');
 
 const router = express.Router();
@@ -151,6 +152,34 @@ router.delete('/skills/:id', protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/reviews
+// @access  Private
+router.get('/reviews', protect, async (req, res) => {
+  try {
+    const reviews = await Review.find({ targetUserId: req.user._id })
+      .populate('reviewerId', 'name avatarUrl username')
+      .populate('skillId', 'name')
+      .sort({ createdAt: -1 });
+    
+    const user = await User.findById(req.user._id).select('hoursTaught');
+    const hoursTaught = user?.hoursTaught || 0;
+
+    let averageRating = 0;
+    if (reviews.length > 0) {
+      averageRating = reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length;
+    }
+
+    res.json({
+      reviews,
+      averageRating: parseFloat(averageRating.toFixed(1)),
+      totalReviews: reviews.length,
+      hoursTaught
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @route   DELETE /api/users/me
 // @access  Private — user deletes their own account
 router.delete('/me', protect, async (req, res) => {
@@ -211,7 +240,10 @@ router.delete('/me', protect, async (req, res) => {
       // 7. Delete user's skills
       await UserSkill.deleteMany({ userId }, opts);
 
-      // 8. Delete the user
+      // 8. Delete user's reviews
+      await Review.deleteMany({ $or: [{ targetUserId: userId }, { reviewerId: userId }] }, opts);
+
+      // 9. Delete the user
       await User.deleteOne({ _id: userId }, opts);
 
       if (session) {
