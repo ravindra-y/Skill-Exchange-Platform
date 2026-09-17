@@ -15,7 +15,7 @@ export default {
           bg:        '#fcfcfd',   // page background
           surface:   '#ffffff',   // card / panel surface
           'surface-2': '#f5f5f6', // subtly tinted surface (alt rows, banners)
-          text:      '#08152e',   // primary text + accent (CTAs, links)
+          text:      '#1a1a1a',   // primary text + accent (CTAs, links)
           muted:     '#787878',   // secondary / caption text
           faint:     '#a8a8a8',   // tertiary / disabled
           line:      '#d8d8d8',   // separator lines

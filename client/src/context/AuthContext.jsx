@@ -31,13 +31,24 @@ export const AuthProvider = ({ children }) => {
     setUser(data);
   };
 
+  const accountLogin = async (accountNumber) => {
+    const { data } = await axios.post('/auth/account-login', { accountNumber });
+    setUser(data);
+  };
+
+  const accountSignup = async () => {
+    const { data } = await axios.post('/auth/account-signup');
+    setUser(data);
+    return data;
+  };
+
   const logout = async () => {
     await axios.post('/auth/logout');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading, setUser }}>
+    <AuthContext.Provider value={{ user, login, signup, accountLogin, accountSignup, logout, loading, setUser }}>
       {children}
     </AuthContext.Provider>
   );

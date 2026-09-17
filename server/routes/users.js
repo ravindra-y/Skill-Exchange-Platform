@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const UserSkill = require('../models/UserSkill');
@@ -17,14 +17,24 @@ const profileValidation = [
     .optional()
     .trim()
     .isLength({ min: 2, max: 60 }).withMessage('Name must be 2–60 characters'),
+  body('username')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 30 }).withMessage('Username must be 3–30 characters')
+    .matches(/^[a-zA-Z0-9_]+$/).withMessage('Username may only contain letters, numbers, underscores'),
   body('bio')
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('Bio must be at most 500 characters'),
   body('avatarUrl')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .isURL({ require_protocol: true }).withMessage('avatarUrl must be a valid URL'),
+    .custom(val => {
+      if (!val || val === '') return true;                          // empty = clear avatar
+      if (val.startsWith('data:image/')) return true;              // canvas data URL
+      try { const u = new URL(val); return u.protocol === 'http:' || u.protocol === 'https:'; }
+      catch { return false; }
+    }).withMessage('avatarUrl must be a valid URL or image data'),
 ];
 
 // ─── Skill add validation ─────────────────────────────────────────────────────
@@ -49,8 +59,18 @@ router.put('/profile', protect, profileValidation, async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Handle username change — check for uniqueness
+    if (req.body.username !== undefined && req.body.username !== user.username) {
+      const taken = await User.findOne({ username: req.body.username });
+      if (taken) {
+        return res.status(400).json({ message: 'Username already taken' });
+      }
+      user.username = req.body.username;
+    }
+
     if (req.body.name      !== undefined) user.name      = req.body.name;
     if (req.body.bio       !== undefined) user.bio       = req.body.bio;
+    // avatarUrl can be a URL string or empty string (to clear it)
     if (req.body.avatarUrl !== undefined) user.avatarUrl = req.body.avatarUrl;
 
     const updatedUser = await user.save();
@@ -119,8 +139,6 @@ router.delete('/skills/:id', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
-module.exports = router;
 
 // @route   DELETE /api/users/me
 // @access  Private — user deletes their own account
@@ -205,3 +223,5 @@ router.delete('/me', protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+module.exports = router;

@@ -135,4 +135,80 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/account-signup
+router.post('/account-signup', authLimiter, async (req, res) => {
+  try {
+    let accountNumber;
+    let isUnique = false;
+    
+    // Generate a unique 16-digit account number
+    while (!isUnique) {
+      accountNumber = '';
+      for (let i = 0; i < 16; i++) {
+        accountNumber += Math.floor(Math.random() * 10).toString();
+      }
+      const existing = await User.findOne({ accountNumber });
+      if (!existing) {
+        isUnique = true;
+      }
+    }
+
+    // Auto-generate required fields
+    const username = `user_${accountNumber}`;
+    const email = `${accountNumber}@anon.local`;
+    const password = accountNumber; // We just need any string, it'll be hashed
+
+    const user = await User.create({
+      name: 'Anonymous User',
+      username,
+      email,
+      passwordHash: password,
+      accountNumber
+    });
+
+    if (user) {
+      generateToken(res, user._id);
+      res.status(201).json({
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        bio: user.bio,
+        accountNumber: user.accountNumber
+      });
+    } else {
+      res.status(400).json({ message: 'Invalid user data' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   POST /api/auth/account-login
+router.post('/account-login', authLimiter, async (req, res) => {
+  const { accountNumber } = req.body;
+  if (!accountNumber || accountNumber.length !== 16) {
+    return res.status(400).json({ message: 'Invalid account number format' });
+  }
+
+  try {
+    const user = await User.findOne({ accountNumber });
+    if (user) {
+      generateToken(res, user._id);
+      res.json({
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        bio: user.bio,
+        accountNumber: user.accountNumber
+      });
+    } else {
+      res.status(401).json({ message: 'Account not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;

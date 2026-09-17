@@ -28,13 +28,20 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  accountNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
 }, {
   timestamps: true,
 });
 
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
+  // Mongoose 9: async hooks must NOT call next() — just return.
+  // next is NOT a function in async hooks; Mongoose uses the resolved/rejected promise.
   if (!this.isModified('passwordHash')) {
-    next();
+    return;
   }
   const salt = await bcrypt.genSalt(10);
   this.passwordHash = await bcrypt.hash(this.passwordHash, salt);

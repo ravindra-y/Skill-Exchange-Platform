@@ -35,7 +35,7 @@ app.use(cors({
   origin: allowedOrigin,
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // ─── Socket.io ───────────────────────────────────────────────────────────────

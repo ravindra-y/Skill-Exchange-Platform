@@ -1,65 +1,219 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
-import { Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X } from 'lucide-react';
+import {
+  Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X,
+  Camera, CheckCircle2, Pencil
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
 
+// ─── Avatar placeholder ────────────────────────────────────────────────────────
+const AvatarPlaceholder = ({ name, size = 72 }) => {
+  const initials = (name || '?')
+    .split(' ')
+    .map(w => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  return (
+    <div
+      style={{ width: size, height: size, fontSize: size * 0.36 }}
+      className="rounded-full bg-brand-surface-2 border border-black/[0.08] flex items-center justify-center font-medium text-brand-muted select-none shrink-0"
+    >
+      {initials}
+    </div>
+  );
+};
+
+// ─── Allowed image types / max size ───────────────────────────────────────────
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_SIZE_MB   = 4;
+const MAX_SIZE_B    = MAX_SIZE_MB * 1024 * 1024;
+
 const Dashboard = () => {
   const { user, setUser, logout } = useContext(AuthContext);
-  const chatCtx = useChat();
-  const totalUnread = chatCtx?.totalUnread ?? 0;
-  const navigate = useNavigate();
+  const chatCtx      = useChat();
+  const totalUnread  = chatCtx?.totalUnread ?? 0;
+  const navigate     = useNavigate();
+  const fileInputRef = useRef(null);
+
+  // ── Data state ──
   const [skills, setSkills]         = useState([]);
   const [allSkills, setAllSkills]   = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [skillType, setSkillType]   = useState('teach');
   const [pageError, setPageError]   = useState('');
-  const [saving, setSaving]         = useState(false);
 
-  // Skill Search State
+  // ── Edit mode state ──
+  const [isEditing, setIsEditing]   = useState(false);
+  const [editForm, setEditForm]     = useState({ name: '', username: '', bio: '' });
+  const [saving, setSaving]         = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ── Avatar upload state ──
+  const [avatarPreview, setAvatarPreview] = useState(null);   // object URL
+  const [avatarFile, setAvatarFile]       = useState(null);   // File object
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError]     = useState('');
+
+  // ── Skill state ──
+  const [skillType, setSkillType]   = useState('teach');
   const [skillSearch, setSkillSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredSkills, setFilteredSkills] = useState([]);
+  const [filteredSkills, setFilteredSkills]   = useState([]);
   const [suggestedSkills, setSuggestedSkills] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching]         = useState(false);
 
-  // Profile edit state
-  const [isEditing, setIsEditing]   = useState(false);
-  const [bio, setBio]               = useState(user?.bio || '');
-
-  // Delete account state
+  // ── Delete account state ──
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword]   = useState('');
   const [deleteError, setDeleteError]         = useState('');
   const [deleting, setDeleting]               = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // ── Initial data fetch ──
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
       const [userSkillsRes, allSkillsRes] = await Promise.all([
         axios.get('/users/skills'),
-        axios.get('/skills')
+        axios.get('/skills'),
       ]);
       setSkills(userSkillsRes.data);
       setAllSkills(allSkillsRes.data);
-    } catch (error) {
+    } catch {
       setPageError('Failed to load skills. Please refresh the page.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateProfile = async () => {
-    setSaving(true);
+  // ── Open edit mode ──
+  const openEdit = () => {
+    setEditForm({
+      name:     user?.name     || '',
+      username: user?.username || '',
+      bio:      user?.bio      || '',
+    });
+    setAvatarPreview(null);
+    setAvatarFile(null);
+    setAvatarError('');
     setPageError('');
+    setSaveSuccess(false);
+    setIsEditing(true);
+  };
+
+  // ── Cancel edit ──
+  const cancelEdit = () => {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarPreview(null);
+    setAvatarFile(null);
+    setAvatarError('');
+    setIsEditing(false);
+  };
+
+  // ── Avatar file selection ──
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError('');
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setAvatarError('Please choose a JPEG, PNG, WebP, or GIF image.');
+      return;
+    }
+    if (file.size > MAX_SIZE_B) {
+      setAvatarError(`Image must be smaller than ${MAX_SIZE_MB} MB.`);
+      return;
+    }
+
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarFile(file);
+    // Clear the file input so the same file can be re-selected if needed
+    e.target.value = '';
+  };
+
+  // ── Upload avatar — resize + compress in-browser, store as data URL ──────────
+  // No external storage service exists in this project. We resize the image to
+  // max 256×256 px and compress it to JPEG at 82 % quality using a canvas.
+  // The resulting data URL is typically 15–40 KB — well within the 10 MB server
+  // body limit we set. No third-party upload service required.
+  const uploadAvatar = async () => {
+    if (!avatarFile) return user?.avatarUrl || '';
+
+    setAvatarUploading(true);
+    setAvatarError('');
     try {
-      const { data } = await axios.put('/users/profile', { bio });
+      const dataUrl = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 256;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+            else                { width  = Math.round((width  * MAX) / height); height = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width  = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(avatarFile);
+      });
+      return dataUrl;
+    } catch {
+      setAvatarError('Failed to process image. Please try again.');
+      return user?.avatarUrl || '';
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // ── Save profile ──
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveSuccess(false);
+    setPageError('');
+    setAvatarError('');
+
+    // Validate name
+    if (!editForm.name.trim() || editForm.name.trim().length < 2) {
+      setPageError('Name must be at least 2 characters.');
+      setSaving(false);
+      return;
+    }
+    if (!editForm.username.trim() || editForm.username.trim().length < 3) {
+      setPageError('Username must be at least 3 characters.');
+      setSaving(false);
+      return;
+    }
+
+    try {
+      // 1. Upload avatar if a new file was chosen
+      let avatarUrl = user?.avatarUrl || '';
+      if (avatarFile) {
+        avatarUrl = await uploadAvatar();
+      }
+
+      // 2. Save profile fields
+      const payload = {
+        name:      editForm.name.trim(),
+        username:  editForm.username.trim(),
+        bio:       editForm.bio.trim(),
+        avatarUrl,
+      };
+      const { data } = await axios.put('/users/profile', payload);
       setUser(data);
+      setSaveSuccess(true);
       setIsEditing(false);
+
+      // Clean up preview URL
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
+      setAvatarFile(null);
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to update profile. Please try again.');
     } finally {
@@ -67,6 +221,7 @@ const Dashboard = () => {
     }
   };
 
+  // ── Skill search debounce ──
   useEffect(() => {
     if (skillSearch.trim().length < 2) {
       setFilteredSkills([]);
@@ -80,18 +235,14 @@ const Dashboard = () => {
     const fetchSkills = async () => {
       try {
         const res = await axios.get(`/skills/search?q=${encodeURIComponent(skillSearch)}`, {
-          signal: controller.signal
+          signal: controller.signal,
         });
-        
-        // Filter out skills the user already has
         const results = res.data.filter(
-          s => !skills.some(userSkill => userSkill.skillId?.name?.toLowerCase() === s.name.toLowerCase())
+          s => !skills.some(us => us.skillId?.name?.toLowerCase() === s.name.toLowerCase())
         );
-        
         setFilteredSkills(results);
       } catch (error) {
         if (!axios.isCancel(error)) {
-          console.error('Skill search error:', error);
           setFilteredSkills([]);
         }
       } finally {
@@ -99,35 +250,23 @@ const Dashboard = () => {
       }
     };
 
-    const delayDebounce = setTimeout(() => {
-      fetchSkills();
-    }, 300);
-
-    return () => {
-      clearTimeout(delayDebounce);
-      controller.abort();
-    };
+    const timer = setTimeout(fetchSkills, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [skillSearch, skills]);
 
   useEffect(() => {
-    const availableSkills = allSkills.filter(s => 
-      !skills.some(userSkill => userSkill.skillId?._id === s._id || userSkill.skillId?.name === s.name)
+    const available = allSkills.filter(s =>
+      !skills.some(us => us.skillId?._id === s._id || us.skillId?.name === s.name)
     );
-    // Suggest some random or first 5 skills
-    setSuggestedSkills(availableSkills.slice(0, 5));
+    setSuggestedSkills(available.slice(0, 5));
   }, [allSkills, skills]);
 
   const handleAddSkill = async (skillObj) => {
     setPageError('');
     try {
-      // 1. Ensure the skill exists in our DB (since ESCO skills only have a URI initially)
       const res = await axios.post('/skills', { name: skillObj.name });
       const finalSkillId = res.data._id;
-      
-      // 2. Add to user skills
       await axios.post('/users/skills', { skillId: finalSkillId, type: skillType });
-      
-      // Refresh user skills
       fetchData();
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to add skill.');
@@ -173,10 +312,16 @@ const Dashboard = () => {
 
       <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8">Profile</h1>
 
-      {/* Error banner */}
+      {/* Global error / success banners */}
       {pageError && (
         <div className="mb-6 px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">
           {pageError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="mb-6 px-4 py-3 text-sm text-status-success bg-green-50 border border-green-200 rounded-[8px] flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          Profile saved successfully.
         </div>
       )}
 
@@ -194,49 +339,190 @@ const Dashboard = () => {
         </Link>
       )}
 
-      {/* Profile card */}
+      {/* ── Profile card ──────────────────────────────────────────────────── */}
       <div className="card card-body mb-6">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h2 className="text-lg font-medium text-brand-text">{user.name}</h2>
-            <p className="text-sm text-brand-muted">@{user.username}</p>
-          </div>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-sm text-brand-muted underline underline-offset-2 hover:text-brand-text transition-colors"
-          >
-            {isEditing ? 'Cancel' : 'Edit'}
-          </button>
-        </div>
-
         {isEditing ? (
-          <div className="mt-4">
-            <label className="input-label">Bio</label>
-            <textarea
-              className="input-field"
-              rows="3"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-            />
-            <button
-              onClick={handleUpdateProfile}
-              disabled={saving}
-              className="btn-primary mt-3"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? 'Saving…' : 'Save bio'}
-            </button>
+          /* ── Edit mode ── */
+          <div>
+            <h2 className="text-base font-medium text-brand-text mb-5">Edit Profile</h2>
+
+            {/* Avatar upload */}
+            <div className="flex items-center gap-5 mb-6">
+              <div className="relative shrink-0">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt="Preview"
+                    className="w-[72px] h-[72px] rounded-full object-cover border border-black/[0.08]"
+                  />
+                ) : user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user.name}
+                    className="w-[72px] h-[72px] rounded-full object-cover border border-black/[0.08]"
+                    onError={e => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <AvatarPlaceholder name={editForm.name || user?.name} />
+                )}
+                {/* Overlay button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 hover:opacity-100 transition-opacity"
+                  aria-label="Change photo"
+                >
+                  <Camera className="w-5 h-5 text-white" />
+                </button>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary text-xs px-3 py-1.5"
+                  disabled={avatarUploading}
+                >
+                  {avatarUploading ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
+                  ) : (
+                    avatarFile ? 'Change photo' : 'Upload photo'
+                  )}
+                </button>
+                {avatarFile && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+                      setAvatarPreview(null);
+                      setAvatarFile(null);
+                      setAvatarError('');
+                    }}
+                    className="ml-2 text-xs text-brand-muted hover:text-status-error transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+                <p className="text-xs text-brand-faint mt-1.5">
+                  JPEG, PNG, WebP or GIF — max {MAX_SIZE_MB} MB
+                </p>
+                {avatarError && (
+                  <p className="text-xs text-status-error mt-1">{avatarError}</p>
+                )}
+              </div>
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_TYPES.join(',')}
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+            </div>
+
+            {/* Name */}
+            <div className="mb-4">
+              <label className="input-label">Full name</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="input-field"
+                maxLength={60}
+              />
+            </div>
+
+            {/* Username */}
+            <div className="mb-4">
+              <label className="input-label">Username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-faint text-sm select-none">@</span>
+                <input
+                  type="text"
+                  value={editForm.username}
+                  onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
+                  className="input-field pl-7"
+                  maxLength={30}
+                />
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div className="mb-5">
+              <label className="input-label">
+                Bio
+                <span className="ml-2 text-brand-faint font-normal">{editForm.bio.length}/500</span>
+              </label>
+              <textarea
+                className="input-field resize-none"
+                rows={3}
+                value={editForm.bio}
+                onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))}
+                maxLength={500}
+                placeholder="Tell others about yourself and what you'd like to learn or teach…"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={cancelEdit}
+                disabled={saving || avatarUploading}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || avatarUploading}
+                className="btn-primary min-w-[120px]"
+              >
+                {(saving || avatarUploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving || avatarUploading ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
           </div>
         ) : (
-          <p className="text-sm text-brand-muted mt-2 leading-relaxed">
-            {user.bio || 'No bio yet.'}
-          </p>
+          /* ── View mode ── */
+          <div className="flex items-start gap-4">
+            {/* Avatar */}
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="w-[72px] h-[72px] rounded-full object-cover border border-black/[0.08] shrink-0"
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <AvatarPlaceholder name={user?.name} />
+            )}
+
+            <div className="flex-1 min-w-0">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-lg font-medium text-brand-text">{user.name}</h2>
+                  <p className="text-sm text-brand-muted">@{user.username}</p>
+                </div>
+                <button
+                  onClick={openEdit}
+                  className="flex items-center gap-1.5 text-sm text-brand-muted hover:text-brand-text transition-colors border border-black/[0.12] hover:border-black/[0.24] px-3 py-1.5 rounded-full"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit profile
+                </button>
+              </div>
+              <p className="text-sm text-brand-muted mt-2 leading-relaxed">
+                {user.bio || <span className="italic text-brand-faint">No bio yet.</span>}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Skills grid */}
+      {/* ── Skills grid ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-        {/* Teach Skills */}
+        {/* Teach */}
         <div className="card card-body">
           <h3 className="text-sm font-medium text-brand-text mb-4 pb-3 border-b border-black/[0.06]">
             Skills I can teach
@@ -250,7 +536,7 @@ const Dashboard = () => {
                   key={skill._id}
                   className="flex justify-between items-center px-3 py-2 bg-brand-surface-2 rounded-[8px]"
                 >
-                  <span className="text-sm font-medium text-brand-text">{skill.skillId.name}</span>
+                  <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
                   <button
                     onClick={() => handleRemoveSkill(skill._id)}
                     className="text-brand-faint hover:text-status-error transition-colors p-1"
@@ -264,7 +550,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Learn Skills */}
+        {/* Learn */}
         <div className="card card-body">
           <h3 className="text-sm font-medium text-brand-text mb-4 pb-3 border-b border-black/[0.06]">
             Skills I want to learn
@@ -278,7 +564,7 @@ const Dashboard = () => {
                   key={skill._id}
                   className="flex justify-between items-center px-3 py-2 bg-brand-surface-2 rounded-[8px]"
                 >
-                  <span className="text-sm font-medium text-brand-text">{skill.skillId.name}</span>
+                  <span className="text-sm font-medium text-brand-text">{skill.skillId?.name}</span>
                   <button
                     onClick={() => handleRemoveSkill(skill._id)}
                     className="text-brand-faint hover:text-status-error transition-colors p-1"
@@ -293,12 +579,12 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Add Skill Form with Search & Suggestions */}
+      {/* ── Add Skill ──────────────────────────────────────────────────────── */}
       <div className="card card-body mb-6 relative">
         <h3 className="text-sm font-medium text-brand-text mb-4">Add a skill</h3>
         <div className="flex flex-col sm:flex-row gap-3 items-start">
           <div className="flex-1 w-full relative">
-            <label className="input-label">Skill</label>
+            <label className="input-label">Search skills</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-4 w-4 text-brand-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -307,23 +593,20 @@ const Dashboard = () => {
               </div>
               <input
                 type="text"
-                placeholder="Skill (ex: Project Management)"
+                placeholder="e.g. Project Management"
                 value={skillSearch}
-                onChange={(e) => {
-                  setSkillSearch(e.target.value);
-                  setShowSuggestions(true);
-                }}
+                onChange={e => { setSkillSearch(e.target.value); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
                 className="input-field pl-10"
               />
             </div>
-            
-            {/* Search Suggestions Dropdown */}
+
+            {/* Dropdown */}
             {showSuggestions && skillSearch.trim().length >= 2 && (
               <div className="absolute z-10 mt-1 w-full bg-brand-surface border border-black/[0.08] rounded-[8px] shadow-lg max-h-60 overflow-y-auto">
                 {isSearching ? (
                   <div className="px-4 py-3 text-sm text-brand-muted flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Searching...
+                    <Loader2 className="w-4 h-4 animate-spin" /> Searching…
                   </div>
                 ) : filteredSkills.length > 0 ? (
                   <ul className="py-1">
@@ -337,24 +620,23 @@ const Dashboard = () => {
                           setShowSuggestions(false);
                         }}
                       >
-                        {s.name} {s.category && <span className="text-brand-faint text-xs ml-2">({s.category})</span>}
+                        {s.name}
+                        {s.category && <span className="text-brand-faint text-xs ml-2">({s.category})</span>}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <div className="px-4 py-3 text-sm text-brand-muted">
-                    No skills found. Try a different search.
-                  </div>
+                  <div className="px-4 py-3 text-sm text-brand-muted">No skills found. Try a different search.</div>
                 )}
               </div>
             )}
           </div>
-          
+
           <div className="w-full sm:w-44">
             <label className="input-label">Type</label>
             <select
               value={skillType}
-              onChange={(e) => setSkillType(e.target.value)}
+              onChange={e => setSkillType(e.target.value)}
               className="input-field"
             >
               <option value="teach">I can teach</option>
@@ -363,10 +645,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Suggested Skills Chips */}
+        {/* Suggested skills */}
         {suggestedSkills.length > 0 && (
           <div className="mt-5">
-            <h4 className="text-sm font-medium text-brand-text mb-3">Suggested based on your profile</h4>
+            <h4 className="text-sm font-medium text-brand-text mb-3">Suggested skills</h4>
             <div className="flex flex-wrap gap-2">
               {suggestedSkills.map(s => (
                 <button
@@ -382,7 +664,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* Danger Zone */}
+      {/* ── Danger Zone ────────────────────────────────────────────────────── */}
       <div className="card card-body border-status-error/20">
         <h3 className="text-sm font-medium text-status-error mb-2 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" /> Danger Zone
@@ -391,18 +673,14 @@ const Dashboard = () => {
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
         <button
-          onClick={() => {
-            setShowDeleteModal(true);
-            setDeleteError('');
-            setDeletePassword('');
-          }}
+          onClick={() => { setShowDeleteModal(true); setDeleteError(''); setDeletePassword(''); }}
           className="text-sm font-medium text-status-error border border-status-error/30 hover:bg-status-error/5 px-4 py-2 rounded-full transition-colors"
         >
           Delete account
         </button>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* ── Delete Confirmation Modal ───────────────────────────────────────── */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-brand-surface border border-black/[0.10] rounded-[8px] shadow-xl max-w-md w-full">
@@ -440,12 +718,11 @@ const Dashboard = () => {
                   type="password"
                   required
                   value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
+                  onChange={e => setDeletePassword(e.target.value)}
                   className="input-field mb-5"
                   placeholder="Password"
                   disabled={deleting}
                 />
-
                 <div className="flex gap-3 justify-end">
                   <button
                     type="button"
