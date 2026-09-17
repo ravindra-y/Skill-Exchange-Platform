@@ -106,6 +106,9 @@ router.post('/login', authLimiter, loginValidation, async (req, res) => {
         username: user.username,
         email: user.email,
         bio: user.bio,
+        avatarUrl: user.avatarUrl,
+        isAvailable: user.isAvailable,
+        socialLinks: user.socialLinks,
       });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });

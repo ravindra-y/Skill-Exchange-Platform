@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  isAvailable: {
+    type: Boolean,
+    default: true,
+  },
+  socialLinks: {
+    github: { type: String, default: '' },
+    linkedin: { type: String, default: '' },
+    website: { type: String, default: '' },
+  },
   accountNumber: {
     type: String,
     unique: true,

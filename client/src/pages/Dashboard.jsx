@@ -3,7 +3,7 @@ import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import {
   Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X,
-  Camera, CheckCircle2, Pencil
+  Camera, CheckCircle2, Pencil, Github, Linkedin, Globe
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
@@ -46,7 +46,10 @@ const Dashboard = () => {
 
   // ── Edit mode state ──
   const [isEditing, setIsEditing]   = useState(false);
-  const [editForm, setEditForm]     = useState({ name: '', username: '', bio: '' });
+  const [editForm, setEditForm]     = useState({ 
+    name: '', username: '', bio: '', 
+    isAvailable: true, github: '', linkedin: '', website: '' 
+  });
   const [saving, setSaving]         = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -92,9 +95,13 @@ const Dashboard = () => {
   // ── Open edit mode ──
   const openEdit = () => {
     setEditForm({
-      name:     user?.name     || '',
-      username: user?.username || '',
-      bio:      user?.bio      || '',
+      name:        user?.name     || '',
+      username:    user?.username || '',
+      bio:         user?.bio      || '',
+      isAvailable: user?.isAvailable ?? true,
+      github:      user?.socialLinks?.github   || '',
+      linkedin:    user?.socialLinks?.linkedin || '',
+      website:     user?.socialLinks?.website  || '',
     });
     setAvatarPreview(null);
     setAvatarFile(null);
@@ -201,10 +208,16 @@ const Dashboard = () => {
 
       // 2. Save profile fields
       const payload = {
-        name:      editForm.name.trim(),
-        username:  editForm.username.trim(),
-        bio:       editForm.bio.trim(),
+        name:        editForm.name.trim(),
+        username:    editForm.username.trim(),
+        bio:         editForm.bio.trim(),
         avatarUrl,
+        isAvailable: editForm.isAvailable,
+        socialLinks: {
+          github:   editForm.github.trim(),
+          linkedin: editForm.linkedin.trim(),
+          website:  editForm.website.trim(),
+        }
       };
       const { data } = await axios.put('/users/profile', payload);
       setUser(data);
@@ -219,6 +232,15 @@ const Dashboard = () => {
       setPageError(error.response?.data?.message || 'Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleAvailability = async () => {
+    try {
+      const { data } = await axios.put('/users/profile', { isAvailable: !(user?.isAvailable ?? true) });
+      setUser(data);
+    } catch (error) {
+      setPageError('Failed to update availability.');
     }
   };
 
@@ -465,6 +487,60 @@ const Dashboard = () => {
               />
             </div>
 
+            {/* Social Links */}
+            <div className="mb-5">
+              <label className="input-label mb-2">Social / Portfolio Links</label>
+              <div className="flex flex-col gap-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted"><Github className="w-4 h-4" /></span>
+                  <input
+                    type="url"
+                    placeholder="GitHub URL"
+                    value={editForm.github}
+                    onChange={e => setEditForm(f => ({ ...f, github: e.target.value }))}
+                    className="input-field pl-9"
+                  />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted"><Linkedin className="w-4 h-4" /></span>
+                  <input
+                    type="url"
+                    placeholder="LinkedIn URL"
+                    value={editForm.linkedin}
+                    onChange={e => setEditForm(f => ({ ...f, linkedin: e.target.value }))}
+                    className="input-field pl-9"
+                  />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted"><Globe className="w-4 h-4" /></span>
+                  <input
+                    type="url"
+                    placeholder="Personal Website URL"
+                    value={editForm.website}
+                    onChange={e => setEditForm(f => ({ ...f, website: e.target.value }))}
+                    className="input-field pl-9"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div className="mb-6 flex items-center justify-between p-3 border border-black/[0.08] rounded-[8px] bg-brand-surface-2">
+              <div>
+                <p className="text-sm font-medium text-brand-text">Availability Status</p>
+                <p className="text-xs text-brand-muted">Are you currently accepting new skill exchange requests?</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={editForm.isAvailable}
+                  onChange={e => setEditForm(f => ({ ...f, isAvailable: e.target.checked }))}
+                />
+                <div className="w-11 h-6 bg-black/[0.12] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-status-success"></div>
+              </label>
+            </div>
+
             {/* Actions */}
             <div className="flex gap-3">
               <button
@@ -502,20 +578,52 @@ const Dashboard = () => {
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-lg font-medium text-brand-text">{user.name}</h2>
-                  <p className="text-sm text-brand-muted">@{user.username}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-medium text-brand-text">{user.name}</h2>
+                    {/* Availability Toggle */}
+                    <button
+                      onClick={handleToggleAvailability}
+                      className="flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full border bg-brand-surface border-black/[0.08] text-brand-muted hover:bg-black/[0.02] transition-colors"
+                      title="Toggle availability"
+                    >
+                      <span>{user?.isAvailable !== false ? '🟢' : '🔴'}</span>
+                      {user?.isAvailable !== false ? 'Available for Skill Exchange' : 'Not Accepting New Requests'}
+                    </button>
+                  </div>
+                  <p className="text-sm text-brand-muted mt-0.5">@{user.username}</p>
                 </div>
                 <button
                   onClick={openEdit}
-                  className="flex items-center gap-1.5 text-sm text-brand-muted hover:text-brand-text transition-colors border border-black/[0.12] hover:border-black/[0.24] px-3 py-1.5 rounded-full"
+                  className="flex items-center gap-1.5 text-sm text-brand-muted hover:text-brand-text transition-colors border border-black/[0.12] hover:border-black/[0.24] px-3 py-1.5 rounded-full shrink-0"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                   Edit profile
                 </button>
               </div>
-              <p className="text-sm text-brand-muted mt-2 leading-relaxed">
+              <p className="text-sm text-brand-muted mt-3 leading-relaxed">
                 {user.bio || <span className="italic text-brand-faint">No bio yet.</span>}
               </p>
+              
+              {/* Social Icons */}
+              {(user?.socialLinks?.github || user?.socialLinks?.linkedin || user?.socialLinks?.website) && (
+                <div className="flex items-center gap-3 mt-4">
+                  {user.socialLinks.github && (
+                    <a href={user.socialLinks.github} target="_blank" rel="noopener noreferrer" className="p-1.5 text-brand-muted hover:text-brand-text hover:bg-black/[0.04] rounded-full transition-colors border border-transparent hover:border-black/[0.08]">
+                      <Github className="w-4 h-4" />
+                    </a>
+                  )}
+                  {user.socialLinks.linkedin && (
+                    <a href={user.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="p-1.5 text-brand-muted hover:text-brand-text hover:bg-black/[0.04] rounded-full transition-colors border border-transparent hover:border-black/[0.08]">
+                      <Linkedin className="w-4 h-4" />
+                    </a>
+                  )}
+                  {user.socialLinks.website && (
+                    <a href={user.socialLinks.website} target="_blank" rel="noopener noreferrer" className="p-1.5 text-brand-muted hover:text-brand-text hover:bg-black/[0.04] rounded-full transition-colors border border-transparent hover:border-black/[0.08]">
+                      <Globe className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

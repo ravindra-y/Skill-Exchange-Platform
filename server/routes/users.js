@@ -35,6 +35,8 @@ const profileValidation = [
       try { const u = new URL(val); return u.protocol === 'http:' || u.protocol === 'https:'; }
       catch { return false; }
     }).withMessage('avatarUrl must be a valid URL or image data'),
+  body('isAvailable').optional().isBoolean().withMessage('isAvailable must be a boolean'),
+  body('socialLinks').optional().isObject().withMessage('socialLinks must be an object'),
 ];
 
 // ─── Skill add validation ─────────────────────────────────────────────────────
@@ -71,19 +73,22 @@ router.put('/profile', protect, profileValidation, async (req, res) => {
       user.username = req.body.username;
     }
 
-    if (req.body.name      !== undefined) user.name      = req.body.name;
-    if (req.body.bio       !== undefined) user.bio       = req.body.bio;
-    // avatarUrl can be a URL string or empty string (to clear it)
-    if (req.body.avatarUrl !== undefined) user.avatarUrl = req.body.avatarUrl;
+    if (req.body.name        !== undefined) user.name        = req.body.name;
+    if (req.body.bio         !== undefined) user.bio         = req.body.bio;
+    if (req.body.avatarUrl   !== undefined) user.avatarUrl   = req.body.avatarUrl;
+    if (req.body.isAvailable !== undefined) user.isAvailable = req.body.isAvailable;
+    if (req.body.socialLinks !== undefined) user.socialLinks = req.body.socialLinks;
 
     const updatedUser = await user.save();
     res.json({
-      _id:       updatedUser._id,
-      name:      updatedUser.name,
-      username:  updatedUser.username,
-      email:     updatedUser.email,
-      bio:       updatedUser.bio,
-      avatarUrl: updatedUser.avatarUrl,
+      _id:         updatedUser._id,
+      name:        updatedUser.name,
+      username:    updatedUser.username,
+      email:       updatedUser.email,
+      bio:         updatedUser.bio,
+      avatarUrl:   updatedUser.avatarUrl,
+      isAvailable: updatedUser.isAvailable,
+      socialLinks: updatedUser.socialLinks,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
