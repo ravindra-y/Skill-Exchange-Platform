@@ -14,9 +14,9 @@ router.get('/', protect, async (req, res) => {
     const currentUserId = req.user._id;
 
     // 1. Get current user's skills
-    const mySkills = await UserSkill.find({ userId: currentUserId });
-    const myTeachSkills = mySkills.filter(s => s.type === 'teach').map(s => s.skillId.toString());
-    const myLearnSkills = mySkills.filter(s => s.type === 'learn').map(s => s.skillId.toString());
+    const mySkills = await UserSkill.find({ userId: currentUserId }).populate('skillId', 'name');
+    const myTeachSkills = mySkills.filter(s => s.type === 'teach').map(s => ({ id: s.skillId._id.toString(), name: s.skillId.name }));
+    const myLearnSkills = mySkills.filter(s => s.type === 'learn').map(s => ({ id: s.skillId._id.toString(), name: s.skillId.name }));
 
     if (myTeachSkills.length === 0 || myLearnSkills.length === 0) {
       return res.json([]); // Need both to compute a match score
@@ -27,7 +27,9 @@ router.get('/', protect, async (req, res) => {
     // but filtering early is better. For now, let's just fetch all other users with any skills.
     
     // Find all UserSkills NOT belonging to me
-    const otherUserSkills = await UserSkill.find({ userId: { $ne: currentUserId } }).populate('userId', 'name username bio avatarUrl');
+    const otherUserSkills = await UserSkill.find({ userId: { $ne: currentUserId } })
+      .populate('userId', 'name username bio avatarUrl')
+      .populate('skillId', 'name');
     
     // Group by user
     const usersMap = {};
@@ -41,9 +43,9 @@ router.get('/', protect, async (req, res) => {
         };
       }
       if (us.type === 'teach') {
-        usersMap[uId].teach.push(us.skillId.toString());
+        usersMap[uId].teach.push({ id: us.skillId._id.toString(), name: us.skillId.name });
       } else {
-        usersMap[uId].learn.push(us.skillId.toString());
+        usersMap[uId].learn.push({ id: us.skillId._id.toString(), name: us.skillId.name });
       }
     });
 
@@ -59,17 +61,13 @@ router.get('/', protect, async (req, res) => {
       if (data.teach.length === 0 || data.learn.length === 0) continue;
 
       // A's teach skills that B wants (My teach skills that They learn)
-      let aTeachBWantCount = 0;
-      myTeachSkills.forEach(skill => {
-        if (data.learn.includes(skill)) aTeachBWantCount++;
-      });
+      const aTeachBWant = myTeachSkills.filter(mySkill => data.learn.some(theirSkill => theirSkill.id === mySkill.id));
+      const aTeachBWantCount = aTeachBWant.length;
       const forwardMatch = aTeachBWantCount / myTeachSkills.length;
 
       // B's teach skills that A wants (Their teach skills that I learn)
-      let bTeachAWantCount = 0;
-      data.teach.forEach(skill => {
-        if (myLearnSkills.includes(skill)) bTeachAWantCount++;
-      });
+      const bTeachAWant = data.teach.filter(theirSkill => myLearnSkills.some(mySkill => mySkill.id === theirSkill.id));
+      const bTeachAWantCount = bTeachAWant.length;
       const reverseMatch = bTeachAWantCount / data.teach.length;
 
       const overallScore = ((forwardMatch + reverseMatch) / 2) * 100;
@@ -79,6 +77,16 @@ router.get('/', protect, async (req, res) => {
         if (overallScore >= 90) label = 'Excellent';
         else if (overallScore >= 70) label = 'Good';
         else if (overallScore >= 40) label = 'Moderate';
+
+        let isPerfectMatch = false;
+        let perfectMatchData = null;
+        if (aTeachBWantCount > 0 && bTeachAWantCount > 0) {
+          isPerfectMatch = true;
+          perfectMatchData = {
+            youTeach: aTeachBWant.map(s => s.name).join(', '),
+            theyTeach: bTeachAWant.map(s => s.name).join(', ')
+          };
+        }
 
         // Check if there's an existing request
         let existingRequest = null;
@@ -98,7 +106,10 @@ router.get('/', protect, async (req, res) => {
           user: data.user,
           score: Math.round(overallScore),
           label,
-          existingRequest
+          existingRequest,
+          isPerfectMatch,
+          perfectMatchData,
+          teachSkills: data.teach
         });
       }
     }

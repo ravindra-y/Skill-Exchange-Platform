@@ -180,6 +180,37 @@ router.get('/reviews', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/reviews
+// @access  Private
+router.post('/reviews', protect, async (req, res) => {
+  const { targetUserId, skillId, rating, comment } = req.body;
+
+  if (!targetUserId || !skillId || !rating) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  if (targetUserId === req.user._id.toString()) {
+    return res.status(400).json({ message: 'You cannot review yourself' });
+  }
+
+  try {
+    const review = await Review.create({
+      targetUserId,
+      reviewerId: req.user._id,
+      skillId,
+      rating,
+      comment
+    });
+    
+    // Add 1 hour taught to the target user optionally? We'll just leave it or increment it.
+    await User.findByIdAndUpdate(targetUserId, { $inc: { hoursTaught: 1 } });
+
+    res.status(201).json(review);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // @route   DELETE /api/users/me
 // @access  Private — user deletes their own account
 router.delete('/me', protect, async (req, res) => {

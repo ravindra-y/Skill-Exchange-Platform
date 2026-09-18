@@ -43,6 +43,8 @@ const Navbar = () => {
   const linkBase = 'relative text-sm font-medium text-brand-muted hover:text-brand-text transition-colors duration-150';
   const linkActive = 'text-brand-text after:absolute after:-bottom-0.5 after:left-0 after:w-full after:h-px after:bg-brand-text';
 
+  if (location.pathname.startsWith('/room/')) return null;
+
   return (
     <nav
       className={`sticky top-0 z-50 transition-all duration-200 ${

@@ -2,12 +2,14 @@ import React, { useState, useEffect, useContext } from 'react';
 import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { Check, X, Video, Loader2, Trash2 } from 'lucide-react';
+import { Check, X, Video, Loader2, Trash2, FolderOpen } from 'lucide-react';
+import SessionWorkspaceModal from '../components/SessionWorkspaceModal';
 
 const Requests = () => {
   const { user } = useContext(AuthContext);
   const [requests, setRequests] = useState({ sent: [], received: [] });
   const [loading, setLoading] = useState(true);
+  const [activeWorkspaceReq, setActiveWorkspaceReq] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -47,32 +49,59 @@ const Requests = () => {
     const otherUser  = isReceived ? req.senderId : req.receiverId;
     const isPending  = req.status === 'pending';
     const isAccepted = req.status === 'accepted';
+    const isCompleted = req.status === 'completed';
 
     return (
       <div className="card card-body flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         {/* Info */}
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
+        <div className="w-full">
+          <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium text-brand-text">{otherUser.name}</span>
             <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
               req.status === 'pending'
                 ? 'bg-brand-surface-2 text-brand-muted border border-black/[0.08]'
                 : req.status === 'accepted'
                 ? 'bg-brand-text text-brand-bg'
+                : req.status === 'completed'
+                ? 'bg-blue-100 text-blue-800 border border-blue-200'
                 : 'bg-brand-surface-2 text-brand-faint'
             }`}>
               {req.status}
             </span>
           </div>
-          <p className="text-xs text-brand-muted">
-            {isReceived
-              ? 'Wants to exchange skills with you'
-              : 'You requested to exchange skills'}
-          </p>
+          
+          <div className="text-xs text-brand-muted space-y-1 mt-2">
+            {req.requestedSkillId && req.offeredSkillId ? (
+              <>
+                <p>
+                  <span className="font-medium">Wants to learn:</span> {req.requestedSkillId.name}
+                </p>
+                <p>
+                  <span className="font-medium">Offers to teach:</span> {req.offeredSkillId.name}
+                </p>
+                {req.proposedDate && (
+                  <p>
+                    <span className="font-medium">Proposed Time:</span> {new Date(req.proposedDate).toLocaleString()}
+                  </p>
+                )}
+                {req.message && (
+                  <p className="mt-2 text-brand-text italic border-l-2 border-brand-surface-2 pl-2">
+                    "{req.message}"
+                  </p>
+                )}
+              </>
+            ) : (
+              <p>
+                {isReceived
+                  ? 'Wants to exchange skills with you'
+                  : 'You requested to exchange skills'}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex gap-2 w-full sm:w-auto shrink-0 flex-wrap">
           {isReceived && isPending && (
             <>
               <button
@@ -98,14 +127,22 @@ const Requests = () => {
             </button>
           )}
           {isAccepted && (
-            <Link
-              to={`/room/${req._id}`}
-              className="btn-primary flex-1 sm:flex-none justify-center py-1.5"
-            >
-              <Video className="w-4 h-4" /> Enter Room
-            </Link>
+            <>
+              <button
+                onClick={() => setActiveWorkspaceReq(req)}
+                className="btn-secondary flex-1 sm:flex-none justify-center py-1.5 whitespace-nowrap"
+              >
+                <FolderOpen className="w-4 h-4 mr-1" /> Workspace
+              </button>
+              <Link
+                to={`/room/${req._id}`}
+                className="btn-primary flex-1 sm:flex-none justify-center py-1.5 whitespace-nowrap"
+              >
+                <Video className="w-4 h-4 mr-1" /> Enter Room
+              </Link>
+            </>
           )}
-          {(req.status === 'rejected' || req.status === 'cancelled') && (
+          {(req.status === 'rejected' || req.status === 'cancelled' || isCompleted) && (
             <button
               onClick={() => handleDeleteRequest(req._id)}
               className="flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded-full border border-black/[0.08] text-brand-muted hover:text-status-error hover:bg-[#fef2f2] hover:border-[#fca5a5] flex items-center justify-center gap-1 transition-colors"
@@ -127,6 +164,20 @@ const Requests = () => {
 
   return (
     <div className="w-full max-w-4xl mx-auto px-6 py-10 sm:px-8">
+      {activeWorkspaceReq && (
+        <SessionWorkspaceModal
+          req={activeWorkspaceReq}
+          currentUserId={user._id}
+          onClose={() => setActiveWorkspaceReq(null)}
+          onUpdate={(updatedReq) => {
+            fetchRequests();
+          }}
+          onComplete={() => {
+            fetchRequests();
+          }}
+        />
+      )}
+
       <h1 className="text-3xl font-medium tracking-tight text-brand-text mb-8">
         Exchange Requests
       </h1>

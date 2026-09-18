@@ -146,6 +146,10 @@ export default function Room() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeletedPanel, setShowDeletedPanel] = useState(false);
 
+  // ── Workspace tabs ────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState('whiteboard'); // 'whiteboard', 'code', 'notes'
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   // ── Refs ───────────────────────────────────────────────────────────────────
   const containerRef     = useRef(null);
   const globalActionLog  = useRef([]);
@@ -483,50 +487,123 @@ export default function Room() {
   // 6. Recording (MediaRecorder — browser only, no backend)
   // ═══════════════════════════════════════════════════════════════════════════
   const startRecording = () => {
-    // Merge local + remote streams into a single MediaStream for recording
     const tracks = [];
+
+    // 1. Always capture the whiteboard canvas as a video track (30 fps).
+    //    This ensures the .webm always has real video frames so any player
+    //    can open it — even when camera is off.
+    if (canvasRef.current) {
+      try {
+        const canvasStream = canvasRef.current.captureStream(30);
+        canvasStream.getVideoTracks().forEach(t => tracks.push(t));
+      } catch (_) {
+        // captureStream not supported — fall through
+      }
+    }
+
+    // 2. Add live mic / camera tracks if active.
     if (localStreamRef.current)  localStreamRef.current.getTracks().forEach(t  => tracks.push(t));
     if (remoteStreamRef.current) remoteStreamRef.current.getTracks().forEach(t => tracks.push(t));
 
+    // 3. If still no audio track, create a silent one so the audio channel
+    //    in the .webm is valid (avoids codec warnings in some players).
+    const hasAudio = tracks.some(t => t.kind === 'audio');
+    if (!hasAudio) {
+      try {
+        const audioCtx = new AudioContext();
+        const dest = audioCtx.createMediaStreamDestination();
+        dest.stream.getAudioTracks().forEach(t => tracks.push(t));
+      } catch (_) { /* ignore */ }
+    }
+
     if (tracks.length === 0) {
-      alert('No media tracks available to record. Start the camera first.');
+      alert('Cannot start recording: no recordable tracks available.');
       return;
     }
 
     const combinedStream = new MediaStream(tracks);
 
-    // Pick best supported MIME type
-    const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
-      .find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+    // Pick best supported MIME type — prefer vp9 for quality
+    const mimeType = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+    ].find(t => MediaRecorder.isTypeSupported(t)) || '';
 
     let mr;
     try {
-      mr = new MediaRecorder(combinedStream, { mimeType });
+      mr = new MediaRecorder(combinedStream, mimeType ? { mimeType } : {});
     } catch (e) {
       alert(`Cannot start recording: ${e.message}`);
       return;
     }
 
-    recordedChunks.current = [];
+    const chunks = [];
     mr.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) recordedChunks.current.push(e.data);
+      if (e.data && e.data.size > 0) chunks.push(e.data);
     };
     mr.onstop = () => {
-      const blob = new Blob(recordedChunks.current, { type: mimeType });
+      const finalMime = mr.mimeType || 'video/webm';
+      const blob = new Blob(chunks, { type: finalMime });
       setRecordingBlob(blob);
       setIsRecording(false);
     };
 
-    mr.start(1000); // collect chunks every 1 s
+    mr.start(500); // smaller chunks = smoother file
     mediaRecorderRef.current = mr;
+    recordedChunks.current = chunks;
     setIsRecording(true);
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    const mr = mediaRecorderRef.current;
+    if (!mr || mr.state === 'inactive') {
       mediaRecorderRef.current = null;
+      return Promise.resolve(null);
     }
+
+    // Return a Promise that resolves with the finished Blob once onstop fires
+    return new Promise((resolve) => {
+      const originalOnStop = mr.onstop;
+      mr.onstop = () => {
+        if (originalOnStop) originalOnStop();
+        resolve(recordingBlob); // blob will be set by originalOnStop
+      };
+      mr.stop();
+      mediaRecorderRef.current = null;
+    });
+  };
+
+  const handleLeave = async () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    const duration = elapsed;
+    stopTimer();
+
+    let finalBlob = recordingBlob; // already-stopped blob (if any)
+
+    if (isRecording) {
+      // Wait for onstop to fire so we have the complete blob
+      const mr = mediaRecorderRef.current;
+      if (mr && mr.state !== 'inactive') {
+        finalBlob = await new Promise((resolve) => {
+          const chunks = recordedChunks.current;
+          mr.onstop = () => {
+            const mime = mr.mimeType || 'video/webm';
+            const blob = new Blob(chunks, { type: mime });
+            setRecordingBlob(blob);
+            setIsRecording(false);
+            resolve(blob);
+          };
+          mr.stop();
+          mediaRecorderRef.current = null;
+        });
+      }
+    }
+
+    leaveRoom();
+    setFinalDuration(duration);
+    if (finalBlob) setRecordingBlob(finalBlob);
+    setSessionDone(true);
   };
 
   const toggleRecording = () => {
@@ -595,16 +672,7 @@ export default function Room() {
     }
   };
 
-  const handleLeave = () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    const duration = elapsed;
-    // Stop recording first so the blob is ready before we render SessionComplete
-    if (isRecording) stopRecording();
-    leaveRoom();
-    stopTimer();
-    setFinalDuration(duration);
-    setSessionDone(true);
-  };
+  // handleLeave is defined above (async, awaits recording blob before transitioning)
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 8. Whiteboard
@@ -1226,113 +1294,74 @@ export default function Room() {
   // 11. Main room layout
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <div ref={containerRef} className={`flex flex-col ${isFullscreen ? 'h-screen' : 'h-[calc(100vh-64px)]'} bg-gray-900 text-white select-none overflow-hidden`}>
+    <div ref={containerRef} className="flex flex-col h-screen bg-brand-bg text-brand-text select-none overflow-hidden relative">
 
       {/* ── Top bar ────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={handleLeave} className="text-gray-400 hover:text-white transition" title="Leave room">
-            <ArrowLeft className="w-5 h-5" />
+      <div className="flex items-center justify-between px-6 py-4 bg-brand-surface border-b border-black/[0.08] shrink-0 z-50 shadow-sm relative">
+        {/* Left */}
+        <div className="flex items-center gap-4 w-1/3">
+          <button onClick={handleLeave} className="text-brand-muted hover:text-brand-text transition-colors flex items-center gap-1.5" title="Exit Session">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm font-medium">Exit</span>
           </button>
+          <div className="h-4 w-px bg-black/[0.08]" />
           <StatusBadge />
           {peerStatus === 'connected' && (
-            <span className="text-xs font-mono text-gray-400">{formatTime(elapsed)}</span>
+            <span className="text-xs font-mono font-medium text-brand-muted bg-brand-surface-2 px-2 py-0.5 rounded-full">{formatTime(elapsed)}</span>
           )}
         </div>
 
-        <span className="text-sm font-medium text-gray-300 hidden sm:block">
-          Skill Exchange Session{partnerName ? ` · ${partnerName}` : ''}
-        </span>
+        {/* Center: Mode Switcher */}
+        <div className="flex items-center justify-center w-1/3">
+          <div className="flex p-1 bg-brand-surface-2 rounded-full border border-black/[0.04]">
+            {['whiteboard', 'code', 'notes'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all capitalize ${
+                  activeTab === tab
+                    ? 'bg-brand-surface text-brand-text shadow-sm'
+                    : 'text-brand-muted hover:text-brand-text hover:bg-black/[0.02]'
+                }`}
+              >
+                {tab === 'whiteboard' ? '🎨 Whiteboard' : tab === 'code' ? '💻 Code' : '📝 Notes'}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <div className="flex items-center gap-2">
-          {/* Socket status dot */}
-          <span
-            title={`Socket: ${socketStatus}`}
-            className={`w-2 h-2 rounded-full ${socketStatus === 'connected' ? 'bg-green-400' : socketStatus === 'error' ? 'bg-red-400' : 'bg-yellow-400'}`}
-          />
-
-          {/* Record button */}
-          <button
-            onClick={toggleRecording}
-            title={isRecording ? 'Stop recording' : 'Start recording'}
-            className={`p-2 rounded-lg transition flex items-center gap-1 text-xs font-medium ${
-              isRecording
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-            }`}
-          >
-            <Circle className={`w-3 h-3 ${isRecording ? 'fill-white animate-pulse' : 'fill-current'}`} />
-            <span className="hidden sm:inline">{isRecording ? 'Stop REC' : 'Record'}</span>
-          </button>
-
-          {/* Recording indicator – always visible when active */}
+        {/* Right */}
+        <div className="flex items-center justify-end w-1/3 gap-3">
           {isRecording && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600 text-white text-xs font-bold animate-pulse">
-              ● REC
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-status-error/10 border border-status-error/20 text-status-error text-[11px] font-bold tracking-wide uppercase animate-pulse">
+              <Circle className="w-2 h-2 fill-current" /> REC
             </span>
           )}
-
-          {/* Mic */}
-          <button
-            onClick={toggleMic}
-            title={micOn ? 'Mute mic' : 'Unmute mic'}
-            className={`p-2 rounded-lg transition ${micOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}
-          >
-            {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-          </button>
-
-          {/* Camera */}
-          <button
-            onClick={toggleCam}
-            title={camOn ? 'Turn off camera' : 'Turn on camera'}
-            className={`p-2 rounded-lg transition ${camOn ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-600 hover:bg-red-700'}`}
-          >
-            {camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-          </button>
-
-          {/* Chat toggle */}
           <button
             onClick={() => setChatOpen(o => !o)}
-            title={chatOpen ? 'Close chat' : 'Open chat'}
-            className={`p-2 rounded-lg transition ${chatOpen ? 'bg-gray-500 hover:bg-gray-400' : 'bg-gray-700 hover:bg-gray-600'}`}
+            className={`p-2 rounded-full transition-colors ${chatOpen ? 'bg-brand-text text-brand-bg' : 'text-brand-muted hover:bg-black/[0.05]'}`}
+            title="Toggle Chat"
           >
             <MessageSquare className="w-4 h-4" />
-          </button>
-
-          {/* Leave */}
-          <button
-            onClick={handleLeave}
-            title="Leave room"
-            className="p-2 bg-red-600 hover:bg-red-700 rounded-lg transition"
-          >
-            <PhoneOff className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {/* ── Media error banner ────────────────────────────────────────────── */}
       {mediaError && (
-        <div className="bg-amber-600 text-white text-sm px-4 py-2 flex items-center gap-2 shrink-0">
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-600 text-white text-[13px] font-medium px-4 py-2 rounded-full shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
           <VideoOff className="w-4 h-4 shrink-0" />
           <span>{mediaError} Whiteboard is still available.</span>
         </div>
       )}
 
-      {/* ── Recording banner (unmistakable, persists while recording) ─────── */}
-      {isRecording && (
-        <div className="shrink-0 bg-red-700 text-white text-sm font-semibold px-4 py-1.5 flex items-center justify-center gap-2">
-          <Circle className="w-3 h-3 fill-white animate-pulse" />
-          Recording in progress — your session is being captured locally
-        </div>
-      )}
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden relative">
 
-      {/* ── Body: video panel + whiteboard + optional chat ─────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* Left: video tiles */}
-        <div className="flex flex-col gap-2 p-2 w-64 shrink-0 bg-gray-900">
+        {/* Left: Video sidebar (Collapsible) */}
+        <div className={`relative flex flex-col gap-3 p-4 shrink-0 bg-brand-surface border-r border-black/[0.08] transition-all duration-300 z-10 ${sidebarOpen ? 'w-[280px]' : 'w-0 p-0 overflow-hidden border-none'}`}>
           {/* Local */}
-          <div className="relative rounded-xl overflow-hidden bg-gray-800 aspect-video flex items-center justify-center">
+          <div className="relative rounded-[16px] overflow-hidden bg-brand-surface-2 aspect-video flex items-center justify-center shadow-sm border border-black/[0.04]">
             <video
               ref={localVideoRef}
               autoPlay muted playsInline
@@ -1340,24 +1369,24 @@ export default function Room() {
             />
             {!camOn && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <VideoOff className="w-8 h-8 text-gray-500" />
+                <VideoOff className="w-8 h-8 text-brand-faint" />
               </div>
             )}
-            <span className="absolute bottom-1 left-2 text-xs font-medium bg-black/60 px-1.5 py-0.5 rounded">You</span>
+            <span className="absolute bottom-2 left-2 text-[10px] font-medium text-brand-bg bg-black/60 px-2 py-0.5 rounded-full backdrop-blur-sm">You</span>
           </div>
 
           {/* Remote */}
-          <div className="relative rounded-xl overflow-hidden bg-gray-800 aspect-video flex items-center justify-center">
+          <div className="relative rounded-[16px] overflow-hidden bg-brand-surface-2 aspect-video flex items-center justify-center shadow-sm border border-black/[0.04]">
             {peerStatus === 'waiting' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
-                <span className="text-xs text-gray-500">Waiting for peer…</span>
+                <Loader2 className="w-6 h-6 animate-spin text-brand-muted" />
+                <span className="text-xs text-brand-muted font-medium">Waiting for peer…</span>
               </div>
             )}
             {peerStatus === 'disconnected' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                <WifiOff className="w-6 h-6 text-red-400" />
-                <span className="text-xs text-red-400">Peer disconnected</span>
+                <WifiOff className="w-6 h-6 text-status-error opacity-80" />
+                <span className="text-xs text-status-error font-medium">Peer disconnected</span>
               </div>
             )}
             <video
@@ -1365,251 +1394,240 @@ export default function Room() {
               autoPlay playsInline
               className={`w-full h-full object-cover ${peerStatus !== 'connected' ? 'invisible' : ''}`}
             />
-            <span className="absolute bottom-1 left-2 text-xs font-medium bg-black/60 px-1.5 py-0.5 rounded">
+            <span className="absolute bottom-2 left-2 text-[10px] font-medium text-brand-bg bg-black/60 px-2 py-0.5 rounded-full backdrop-blur-sm">
               {partnerName || 'Peer'}
             </span>
           </div>
-
-          {/* Download recording if stopped inside room */}
-          {recordingBlob && !isRecording && (
-            <button
-              onClick={() => {
-                const url  = URL.createObjectURL(recordingBlob);
-                const a    = document.createElement('a');
-                a.href     = url;
-                a.download = `session-${Date.now()}.webm`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="flex items-center justify-center gap-2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-medium transition"
-            >
-              <Download className="w-3 h-3" /> Download Recording
-            </button>
-          )}
         </div>
 
-        {/* Centre: whiteboard */}
-        <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Toolbar */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-800 border-b border-gray-700 shrink-0 flex-wrap overflow-visible">
-            <button onClick={() => setTool('pointer')} className={`p-2 rounded-lg transition ${tool === 'pointer' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Select/Move Images">
-              <MousePointer2 className="w-4 h-4" />
-            </button>
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-            <button onClick={() => setTool('pen')} className={`p-2 rounded-lg transition ${tool === 'pen' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Pen">
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button onClick={() => setTool('eraser')} className={`p-2 rounded-lg transition ${tool === 'eraser' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Eraser">
-              <Eraser className="w-4 h-4" />
-            </button>
-            <button onClick={() => setTool('delete-element')} className={`p-2 rounded-lg transition ${tool === 'delete-element' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Delete Element">
-              <Delete className="w-4 h-4" />
-            </button>
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-            <button onClick={() => setTool('rect')} className={`p-2 rounded-lg transition ${tool === 'rect' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Rectangle">
-              <Square className="w-4 h-4" />
-            </button>
-            <button onClick={() => setTool('circle')} className={`p-2 rounded-lg transition ${tool === 'circle' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Circle">
-              <CircleIcon className="w-4 h-4" />
-            </button>
-            <button onClick={() => setTool('line')} className={`p-2 rounded-lg transition ${tool === 'line' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Line">
-              <Minus className="w-4 h-4" />
-            </button>
-            <button onClick={() => setTool('arrow')} className={`p-2 rounded-lg transition ${tool === 'arrow' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Arrow">
-              <ArrowUpRight className="w-4 h-4" />
-            </button>
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-            <button onClick={() => setTool('text')} className={`p-2 rounded-lg transition ${tool === 'text' ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'}`} title="Text">
-              <Type className="w-4 h-4" />
-            </button>
-            <div className="relative">
-              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg transition bg-gray-700 hover:bg-gray-600" title="Add Image">
-                <ImageIcon className="w-4 h-4" />
-              </button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-            </div>
+        {/* Sidebar Toggle Button */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 transition-all duration-300" style={{ transform: `translate(${sidebarOpen ? '280px' : '0px'}, -50%)` }}>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-6 h-12 bg-brand-surface border border-black/[0.08] rounded-r-lg shadow-sm flex items-center justify-center hover:bg-black/[0.02] text-brand-muted"
+          >
+            <span className="text-[10px] font-bold">{sidebarOpen ? '«' : '»'}</span>
+          </button>
+        </div>
 
-            <div className="w-px h-5 bg-gray-600 mx-1" />
+        {/* Center: Canvas / Editor */}
+        <div className="flex flex-col flex-1 overflow-hidden relative bg-brand-surface-2">
+          
+          {activeTab === 'whiteboard' && (
+            <>
+              {/* Vertical Floating Whiteboard Toolbar */}
+              <div className="absolute left-6 top-6 z-30 flex flex-col gap-1.5 p-2 bg-brand-surface border border-black/[0.08] rounded-2xl shadow-sm">
+                <button onClick={() => setTool('pointer')} className={`p-2.5 rounded-xl transition-all ${tool === 'pointer' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Select/Move">
+                  <MousePointer2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTool('pen')} className={`p-2.5 rounded-xl transition-all ${tool === 'pen' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Pen">
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTool('rect')} className={`p-2.5 rounded-xl transition-all ${tool === 'rect' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Rectangle">
+                  <Square className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTool('circle')} className={`p-2.5 rounded-xl transition-all ${tool === 'circle' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Circle">
+                  <CircleIcon className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTool('text')} className={`p-2.5 rounded-xl transition-all ${tool === 'text' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Text">
+                  <Type className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTool('eraser')} className={`p-2.5 rounded-xl transition-all ${tool === 'eraser' ? 'bg-brand-surface-2 text-brand-text' : 'text-brand-muted hover:bg-black/[0.04]'}`} title="Eraser">
+                  <Eraser className="w-4 h-4" />
+                </button>
 
-            {COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => setStrokeColor(c)}
-                style={{
-                  backgroundColor: c,
-                  border: strokeColor === c ? '2px solid white' : '2px solid transparent',
-                }}
-                className="w-6 h-6 rounded-full transition shrink-0"
-                title={c}
-              />
-            ))}
+                <div className="w-full h-px bg-black/[0.08] my-1" />
 
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-
-            <input
-              type="range" min="1" max="20"
-              value={strokeWidth}
-              onChange={e => setStrokeWidth(Number(e.target.value))}
-              className="w-20 accent-brand-text"
-              title="Stroke width"
-            />
-            <span className="text-xs text-gray-400 w-4">{strokeWidth}</span>
-
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-
-            {/* Undo / Redo */}
-            <button onClick={handleUndo} disabled={!canUndo} className="p-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600" title="Undo">
-              <Undo className="w-4 h-4" />
-            </button>
-            <button onClick={handleRedo} disabled={!canRedo} className="p-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600" title="Redo">
-              <Redo className="w-4 h-4" />
-            </button>
-
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-
-            {/* Recently deleted */}
-            <div className="relative">
-              <button onClick={() => setShowDeletedPanel(p => !p)} className={`p-2 rounded-lg transition ${showDeletedPanel ? 'bg-gray-500' : 'bg-gray-700 hover:bg-gray-600'} flex items-center gap-1`} title="Recently Deleted">
-                <History className="w-4 h-4" />
-                {deletedImages.length > 0 && <span className="text-[10px] font-bold bg-red-600 px-1.5 rounded-full">{deletedImages.length}</span>}
-              </button>
-              {showDeletedPanel && deletedImages.length > 0 && (
-                <div className="absolute top-full left-0 mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl p-2 z-50 w-48 max-h-64 overflow-y-auto">
-                  <div className="text-xs font-medium text-gray-400 mb-2">Recently Deleted</div>
-                  <div className="flex flex-col gap-2">
-                    {deletedImages.map(img => (
-                      <div key={img.id} className="flex items-center justify-between gap-2 p-1 hover:bg-gray-700 rounded transition group">
-                        <img src={img.dataUrl} className="w-8 h-8 object-cover rounded bg-white" alt="deleted" />
-                        <div className="flex gap-1">
-                          <button onClick={() => {
-                            const deleteAction = globalActionLog.current.find(a => (a.type === 'delete-image' || a.type === 'delete-element') && a.targetId === img.id && !a.isUndone);
-                            if (deleteAction) {
-                              deleteAction.isUndone = true;
-                              renderCanvasFromLog();
-                              updateUndoRedoState();
-                              if (socketRef.current) socketRef.current.emit('whiteboard-undo', { roomId: roomIdRef.current, actionId: deleteAction.id });
-                            }
-                          }} className="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition">Restore</button>
-                          
-                          <button onClick={() => {
-                            if (!window.confirm("Permanently delete this item?")) return;
-                            const actionId = Date.now().toString();
-                            addActionToLog({ id: actionId, userId: user._id, type: 'permanent-delete', targetId: img.id });
-                            renderCanvasFromLog();
-                            if (socketRef.current) socketRef.current.emit('whiteboard-permanent-delete', { roomId: roomIdRef.current, actionId, targetId: img.id, userId: user._id });
-                          }} className="text-xs bg-red-600 hover:bg-red-500 p-1 rounded opacity-0 group-hover:opacity-100 transition" title="Delete permanently">
-                            <XSquare className="w-3 h-3 text-white" />
-                          </button>
-                        </div>
-                      </div>
+                {/* Color Picker (Compact) */}
+                <div className="relative group flex justify-center p-2">
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-brand-surface shadow-sm cursor-pointer"
+                    style={{ backgroundColor: strokeColor }}
+                  />
+                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 hidden group-hover:flex bg-brand-surface border border-black/[0.08] rounded-xl p-2 gap-2 shadow-lg">
+                    {COLORS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setStrokeColor(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${strokeColor === c ? 'ring-2 ring-brand-text ring-offset-1' : ''}`}
+                      />
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div className="w-px h-5 bg-gray-600 mx-1" />
-
-            <button onClick={toggleFullscreen} className="p-2 rounded-lg transition bg-gray-700 hover:bg-gray-600" title="Toggle Fullscreen">
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={() => clearCanvas(true)}
-              className="p-2 bg-gray-700 hover:bg-red-700 rounded-lg transition"
-              title="Clear whiteboard"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Canvas & Overlays */}
-          <div className="relative flex-1 bg-white overflow-hidden">
-            {images.map(img => (
-              <div
-                key={img.id}
-                className="group"
-                style={{
-                  position: 'absolute',
-                  left: img.x,
-                  top: img.y,
-                  width: img.width,
-                  height: img.height,
-                  cursor: tool === 'pointer' ? 'move' : 'default',
-                  zIndex: 10
-                }}
-                onPointerDown={(e) => handleImagePointerDown(e, img)}
-              >
-                <img src={img.dataUrl} alt="Whiteboard imported" className="w-full h-full object-fill pointer-events-none" />
+                <div className="w-full h-px bg-black/[0.08] my-1" />
                 
-                {tool === 'pointer' && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img); }}
-                    className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow z-50"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
+                <button onClick={handleUndo} disabled={!canUndo} className="p-2.5 rounded-xl transition-all disabled:opacity-30 hover:bg-black/[0.04] text-brand-muted" title="Undo">
+                  <Undo className="w-4 h-4" />
+                </button>
+                <button onClick={handleRedo} disabled={!canRedo} className="p-2.5 rounded-xl transition-all disabled:opacity-30 hover:bg-black/[0.04] text-brand-muted" title="Redo">
+                  <Redo className="w-4 h-4" />
+                </button>
+                <button onClick={() => clearCanvas(true)} className="p-2.5 rounded-xl transition-all hover:bg-status-error/10 hover:text-status-error text-brand-muted mt-2" title="Clear Canvas">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
 
-                {tool === 'pointer' && (
+              {/* Canvas Overlays & Element */}
+              <div className="absolute inset-0 bg-brand-surface z-0 overflow-hidden" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, rgba(0,0,0,0.05) 1.5px, transparent 0)', backgroundSize: '24px 24px' }}>
+                {images.map(img => (
                   <div
-                    onPointerDown={(e) => handleHandlePointerDown(e, img)}
-                    className="absolute right-0 bottom-0 w-4 h-4 bg-blue-500 border-2 border-white rounded-full cursor-nwse-resize transform translate-x-1/2 translate-y-1/2 z-50"
+                    key={img.id}
+                    className="group"
+                    style={{ position: 'absolute', left: img.x, top: img.y, width: img.width, height: img.height, cursor: tool === 'pointer' ? 'move' : 'default', zIndex: 10 }}
+                    onPointerDown={(e) => handleImagePointerDown(e, img)}
+                  >
+                    <img src={img.dataUrl} alt="Imported" className="w-full h-full object-fill pointer-events-none rounded shadow-sm" />
+                    {tool === 'pointer' && (
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteImage(img); }} className="absolute -top-3 -right-3 bg-status-error hover:brightness-110 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition shadow-sm z-50">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
+                    {tool === 'pointer' && (
+                      <div onPointerDown={(e) => handleHandlePointerDown(e, img)} className="absolute right-0 bottom-0 w-4 h-4 bg-brand-blue border-2 border-white rounded-full cursor-nwse-resize transform translate-x-1/2 translate-y-1/2 z-50 shadow-sm" />
+                    )}
+                  </div>
+                ))}
+                
+                <canvas
+                  ref={canvasRef}
+                  style={{ pointerEvents: tool === 'pointer' ? 'none' : 'auto', zIndex: 20 }}
+                  className={`absolute inset-0 w-full h-full ${tool === 'text' ? 'cursor-text' : 'cursor-crosshair'} touch-none`}
+                  onMouseDown={onPointerDown}
+                  onMouseMove={onPointerMove}
+                  onMouseUp={onPointerUp}
+                  onMouseLeave={onPointerUp}
+                  onTouchStart={onPointerDown}
+                  onTouchMove={onPointerMove}
+                  onTouchEnd={onPointerUp}
+                />
+
+                {tool === 'text' && textCursor && (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={textValue}
+                    onChange={e => setTextValue(e.target.value)}
+                    onBlur={commitText}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitText(); } }}
+                    style={{ position: 'absolute', left: textCursor.x, top: textCursor.y, color: strokeColor, zIndex: 30 }}
+                    className="bg-transparent border-none outline-none p-0 m-0 text-[16px] font-sans leading-none"
+                    placeholder="Type..."
                   />
                 )}
               </div>
-            ))}
-            
-            <canvas
-              ref={canvasRef}
-              style={{ pointerEvents: tool === 'pointer' ? 'none' : 'auto', zIndex: 20 }}
-              className={`absolute inset-0 w-full h-full ${tool === 'text' ? 'cursor-text' : 'cursor-crosshair'} touch-none`}
-              onMouseDown={onPointerDown}
-              onMouseMove={onPointerMove}
-              onMouseUp={onPointerUp}
-              onMouseLeave={onPointerUp}
-              onTouchStart={onPointerDown}
-              onTouchMove={onPointerMove}
-              onTouchEnd={onPointerUp}
-            />
+            </>
+          )}
 
-            {tool === 'text' && textCursor && (
-              <input
-                autoFocus
-                type="text"
-                value={textValue}
-                onChange={e => setTextValue(e.target.value)}
-                onBlur={commitText}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commitText();
-                  }
-                }}
-                style={{
-                  position: 'absolute',
-                  left: textCursor.x,
-                  top: textCursor.y,
-                  color: strokeColor,
-                  zIndex: 30
-                }}
-                className="bg-transparent border-none outline-none p-0 m-0 text-[16px] font-sans leading-none"
-                placeholder="Type here..."
-              />
-            )}
-          </div>
+          {activeTab === 'code' && (
+            <div className="absolute inset-0 bg-[#1e1e1e] flex flex-col z-0">
+              <div className="flex bg-[#2d2d2d] px-4 py-2 border-b border-[#3e3e3e]">
+                <div className="px-3 py-1 bg-[#1e1e1e] text-gray-300 text-xs font-medium rounded-t-md">index.js</div>
+              </div>
+              <div className="flex-1 p-6 text-gray-400 font-mono text-sm leading-relaxed overflow-auto">
+                <span className="text-gray-500">{"// Collaborative Code Editor Placeholder"}</span><br/><br/>
+                <span className="text-pink-500">function</span> <span className="text-blue-400">helloWorld</span>() {"{"}<br/>
+                &nbsp;&nbsp;<span className="text-pink-500">return</span> <span className="text-yellow-300">"Welcome to the session!"</span>;<br/>
+                {"}"}<br/><br/>
+                <span className="text-gray-500">{"/* Code editor implementation goes here... */"}</span>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notes' && (
+            <div className="absolute inset-0 bg-brand-surface z-0 p-8 overflow-auto">
+              <div className="max-w-2xl mx-auto h-full flex flex-col">
+                <h3 className="text-xl font-medium mb-4 text-brand-text">Session Notes & Agenda</h3>
+                <textarea 
+                  className="flex-1 w-full p-4 bg-brand-surface-2 rounded-xl border border-black/[0.08] focus:outline-none focus:border-brand-text focus:ring-1 focus:ring-brand-text resize-none text-[15px] leading-relaxed" 
+                  placeholder="Draft your session agenda or notes here... (Placeholder for shared notes)"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right: chat panel (toggled) */}
+        {/* Right: Chat Panel */}
         {chatOpen && (
-          <div className="w-72 shrink-0">
-            <ChatPanel
-              exchangeRequestId={exchangeRequestId}
-              onClose={() => setChatOpen(false)}
-            />
+          <div className="w-[320px] shrink-0 border-l border-black/[0.08] bg-brand-surface z-20">
+            <ChatPanel exchangeRequestId={exchangeRequestId} onClose={() => setChatOpen(false)} />
           </div>
         )}
       </div>
+
+      {/* ── Floating Call Control Dock ──────────────────────────────────────── */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 bg-[#202124] rounded-full shadow-2xl border border-white/10 backdrop-blur-md">
+        <button
+          onClick={toggleMic}
+          className={`p-3 rounded-full transition-all ${micOn ? 'bg-[#3c4043] hover:bg-[#4a4d51] text-white' : 'bg-[#ea4335] hover:bg-[#d93025] text-white'}`}
+          title={micOn ? 'Turn off microphone' : 'Turn on microphone'}
+        >
+          {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+        </button>
+        <button
+          onClick={toggleCam}
+          className={`p-3 rounded-full transition-all ${camOn ? 'bg-[#3c4043] hover:bg-[#4a4d51] text-white' : 'bg-[#ea4335] hover:bg-[#d93025] text-white'}`}
+          title={camOn ? 'Turn off camera' : 'Turn on camera'}
+        >
+          {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+        </button>
+        
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
+        {/* Record / Stop + Download */}
+        <button
+          onClick={toggleRecording}
+          className={`p-3 rounded-full transition-all flex items-center gap-2 ${isRecording ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-[#3c4043] hover:bg-[#4a4d51] text-white'}`}
+          title={isRecording ? 'Stop Recording' : 'Start Recording'}
+        >
+          {isRecording ? (
+            <>
+              <span className="w-4 h-4 rounded-sm bg-white inline-block shrink-0" />
+              <span className="text-xs font-bold tracking-wide pr-1">STOP</span>
+            </>
+          ) : (
+            <Circle className="w-5 h-5" />
+          )}
+        </button>
+
+        {/* Download button — appears after recording finishes */}
+        {recordingBlob && !isRecording && (
+          <>
+            <div className="w-px h-6 bg-white/20 mx-1" />
+            <button
+              onClick={() => {
+                const ext = recordingBlob.type.includes('audio') ? 'webm' : 'webm';
+                const url = URL.createObjectURL(recordingBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `session-recording-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+              }}
+              className="flex items-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-full transition-all"
+              title="Download recording"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download</span>
+            </button>
+          </>
+        )}
+
+        <div className="w-px h-6 bg-white/20 mx-1" />
+
+        <button
+          onClick={handleLeave}
+          className="px-6 py-3 bg-[#ea4335] hover:bg-[#d93025] text-white font-medium text-sm rounded-full transition-all flex items-center gap-2 ml-1"
+          title="Leave call"
+        >
+          <PhoneOff className="w-4 h-4" /> End Call
+        </button>
+
+      </div>
+
     </div>
   );
 }

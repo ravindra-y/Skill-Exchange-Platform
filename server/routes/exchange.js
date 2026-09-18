@@ -9,7 +9,7 @@ const router = express.Router();
 // @desc    Send an exchange request
 // @access  Private
 router.post('/', protect, async (req, res) => {
-  const { receiverId } = req.body; // Can also send requestedSkillId if we want
+  const { receiverId, requestedSkillId, offeredSkillId, proposedDate, message } = req.body; 
 
   if (receiverId === req.user._id.toString()) {
     return res.status(400).json({ message: 'Cannot send request to yourself' });
@@ -31,7 +31,11 @@ router.post('/', protect, async (req, res) => {
 
     const exchangeReq = await ExchangeRequest.create({
       senderId: req.user._id,
-      receiverId
+      receiverId,
+      requestedSkillId,
+      offeredSkillId,
+      proposedDate,
+      message
     });
 
     res.status(201).json(exchangeReq);
@@ -47,10 +51,14 @@ router.get('/', protect, async (req, res) => {
   try {
     const sent = await ExchangeRequest.find({ senderId: req.user._id })
       .populate('receiverId', 'name username avatarUrl')
+      .populate('requestedSkillId', 'name')
+      .populate('offeredSkillId', 'name')
       .sort({ createdAt: -1 });
 
     const received = await ExchangeRequest.find({ receiverId: req.user._id })
       .populate('senderId', 'name username avatarUrl')
+      .populate('requestedSkillId', 'name')
+      .populate('offeredSkillId', 'name')
       .sort({ createdAt: -1 });
 
     res.json({ sent, received });
@@ -60,12 +68,12 @@ router.get('/', protect, async (req, res) => {
 });
 
 // @route   PUT /api/exchange/:id/status
-// @desc    Update request status (accept, reject, cancel)
+// @desc    Update request status (accept, reject, cancel, completed)
 // @access  Private
 router.put('/:id/status', protect, async (req, res) => {
-  const { status } = req.body; // 'accepted', 'rejected', 'cancelled'
+  const { status } = req.body; // 'accepted', 'rejected', 'cancelled', 'completed'
 
-  if (!['accepted', 'rejected', 'cancelled'].includes(status)) {
+  if (!['accepted', 'rejected', 'cancelled', 'completed'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
   }
 
@@ -84,6 +92,14 @@ router.put('/:id/status', protect, async (req, res) => {
       }
       if (request.status !== 'pending') {
         return res.status(400).json({ message: 'Can only cancel pending requests' });
+      }
+    } else if (status === 'completed') {
+      // Either party can mark as completed if currently accepted
+      if (request.senderId.toString() !== req.user._id.toString() && request.receiverId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Not authorized to complete' });
+      }
+      if (request.status !== 'accepted') {
+        return res.status(400).json({ message: 'Can only complete accepted requests' });
       }
     } else {
       // accept / reject: Only receiver can do this, and only if pending
@@ -104,7 +120,47 @@ router.put('/:id/status', protect, async (req, res) => {
         exchangeRequestId: request._id,
         status: 'active'
       });
+    } else if (status === 'completed') {
+      // End the room if it exists
+      await Room.findOneAndUpdate(
+        { exchangeRequestId: request._id, status: 'active' },
+        { status: 'ended', endedAt: Date.now() }
+      );
     }
+
+    res.json(request);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// @route   PUT /api/exchange/:id/workspace
+// @desc    Update workspace (sharedLinks, agendaItems)
+// @access  Private
+router.put('/:id/workspace', protect, async (req, res) => {
+  const { sharedLinks, agendaItems } = req.body;
+
+  try {
+    const request = await ExchangeRequest.findById(req.params.id);
+
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    // Must be participant
+    if (request.senderId.toString() !== req.user._id.toString() && request.receiverId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Must be accepted
+    if (request.status !== 'accepted') {
+      return res.status(400).json({ message: 'Session is not active' });
+    }
+
+    if (sharedLinks !== undefined) request.sharedLinks = sharedLinks;
+    if (agendaItems !== undefined) request.agendaItems = agendaItems;
+
+    await request.save();
 
     res.json(request);
   } catch (error) {

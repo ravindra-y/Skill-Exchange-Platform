@@ -8,15 +8,27 @@ router.get('/', protect, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const { search, tag } = req.query;
     const skip = (page - 1) * limit;
 
-    const posts = await Post.find()
-      .populate('authorId', 'name username')
+    const query = {};
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { content: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (tag && tag !== 'All') {
+      query.tags = tag;
+    }
+
+    const posts = await Post.find(query)
+      .populate('authorId', 'name username profilePicture')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await Post.countDocuments();
+    const total = await Post.countDocuments(query);
     const hasMore = skip + posts.length < total;
 
     res.json({ posts, hasMore, total });
@@ -29,7 +41,7 @@ router.get('/', protect, async (req, res) => {
 // GET /api/posts/:id - single post
 router.get('/:id', protect, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('authorId', 'name username');
+    const post = await Post.findById(req.params.id).populate('authorId', 'name username profilePicture');
     if (!post) return res.status(404).json({ message: 'Post not found' });
     res.json(post);
   } catch (err) {
