@@ -1,60 +1,79 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const { protect } = require('../middleware/auth');
-const User = require('../models/User');
-const UserSkill = require('../models/UserSkill');
-const ExchangeRequest = require('../models/ExchangeRequest');
-const Message = require('../models/Message');
-const Room = require('../models/Room');
-const RoomParticipant = require('../models/RoomParticipant');
-const Review = require('../models/Review');
-const mongoose = require('mongoose');
+const express = require("express");
+const { body, validationResult } = require("express-validator");
+const { protect } = require("../middleware/auth");
+const User = require("../models/User");
+const UserSkill = require("../models/UserSkill");
+const ExchangeRequest = require("../models/ExchangeRequest");
+const Message = require("../models/Message");
+const Room = require("../models/Room");
+const RoomParticipant = require("../models/RoomParticipant");
+const Review = require("../models/Review");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
 // ─── Profile update validation ────────────────────────────────────────────────
 const profileValidation = [
-  body('name')
+  body("name")
     .optional()
     .trim()
-    .isLength({ min: 2, max: 60 }).withMessage('Name must be 2–60 characters'),
-  body('username')
+    .isLength({ min: 2, max: 60 })
+    .withMessage("Name must be 2–60 characters"),
+  body("username")
     .optional()
     .trim()
-    .isLength({ min: 3, max: 30 }).withMessage('Username must be 3–30 characters')
-    .matches(/^[a-zA-Z0-9_]+$/).withMessage('Username may only contain letters, numbers, underscores'),
-  body('bio')
+    .isLength({ min: 3, max: 30 })
+    .withMessage("Username must be 3–30 characters")
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage("Username may only contain letters, numbers, underscores"),
+  body("bio")
     .optional()
     .trim()
-    .isLength({ max: 500 }).withMessage('Bio must be at most 500 characters'),
-  body('avatarUrl')
+    .isLength({ max: 500 })
+    .withMessage("Bio must be at most 500 characters"),
+  body("avatarUrl")
     .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .custom(val => {
-      if (!val || val === '') return true;                          // empty = clear avatar
-      if (val.startsWith('data:image/')) return true;              // canvas data URL
-      try { const u = new URL(val); return u.protocol === 'http:' || u.protocol === 'https:'; }
-      catch { return false; }
-    }).withMessage('avatarUrl must be a valid URL or image data'),
-  body('isAvailable').optional().isBoolean().withMessage('isAvailable must be a boolean'),
-  body('socialLinks').optional().isObject().withMessage('socialLinks must be an object'),
+    .custom((val) => {
+      if (!val || val === "") return true; // empty = clear avatar
+      if (val.startsWith("data:image/")) return true; // canvas data URL
+      try {
+        const u = new URL(val);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    })
+    .withMessage("avatarUrl must be a valid URL or image data"),
+  body("isAvailable")
+    .optional()
+    .isBoolean()
+    .withMessage("isAvailable must be a boolean"),
+  body("socialLinks")
+    .optional()
+    .isObject()
+    .withMessage("socialLinks must be an object"),
 ];
 
 // ─── Skill add validation ─────────────────────────────────────────────────────
 const skillValidation = [
-  body('skillId')
-    .notEmpty().withMessage('skillId is required')
-    .custom(val => mongoose.Types.ObjectId.isValid(val)).withMessage('Invalid skillId'),
-  body('type')
-    .isIn(['teach', 'learn']).withMessage('type must be "teach" or "learn"'),
-  body('level')
+  body("skillId")
+    .notEmpty()
+    .withMessage("skillId is required")
+    .custom((val) => mongoose.Types.ObjectId.isValid(val))
+    .withMessage("Invalid skillId"),
+  body("type")
+    .isIn(["teach", "learn"])
+    .withMessage('type must be "teach" or "learn"'),
+  body("level")
     .optional()
-    .isIn(['Beginner', 'Intermediate', 'Expert']).withMessage('Invalid level'),
+    .isIn(["Beginner", "Intermediate", "Expert"])
+    .withMessage("Invalid level"),
 ];
 
 // @route   PUT /api/users/profile
 // @access  Private — user can only edit their own profile (JWT id used, no body id accepted)
-router.put('/profile', protect, profileValidation, async (req, res) => {
+router.put("/profile", protect, profileValidation, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ message: errors.array()[0].msg });
@@ -63,31 +82,36 @@ router.put('/profile', protect, profileValidation, async (req, res) => {
   try {
     // Always use req.user._id from the verified JWT — never trust a body userId
     const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     // Handle username change — check for uniqueness
-    if (req.body.username !== undefined && req.body.username !== user.username) {
+    if (
+      req.body.username !== undefined &&
+      req.body.username !== user.username
+    ) {
       const taken = await User.findOne({ username: req.body.username });
       if (taken) {
-        return res.status(400).json({ message: 'Username already taken' });
+        return res.status(400).json({ message: "Username already taken" });
       }
       user.username = req.body.username;
     }
 
-    if (req.body.name        !== undefined) user.name        = req.body.name;
-    if (req.body.bio         !== undefined) user.bio         = req.body.bio;
-    if (req.body.avatarUrl   !== undefined) user.avatarUrl   = req.body.avatarUrl;
-    if (req.body.isAvailable !== undefined) user.isAvailable = req.body.isAvailable;
-    if (req.body.socialLinks !== undefined) user.socialLinks = req.body.socialLinks;
+    if (req.body.name !== undefined) user.name = req.body.name;
+    if (req.body.bio !== undefined) user.bio = req.body.bio;
+    if (req.body.avatarUrl !== undefined) user.avatarUrl = req.body.avatarUrl;
+    if (req.body.isAvailable !== undefined)
+      user.isAvailable = req.body.isAvailable;
+    if (req.body.socialLinks !== undefined)
+      user.socialLinks = req.body.socialLinks;
 
     const updatedUser = await user.save();
     res.json({
-      _id:         updatedUser._id,
-      name:        updatedUser.name,
-      username:    updatedUser.username,
-      email:       updatedUser.email,
-      bio:         updatedUser.bio,
-      avatarUrl:   updatedUser.avatarUrl,
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      username: updatedUser.username,
+      email: updatedUser.email,
+      bio: updatedUser.bio,
+      avatarUrl: updatedUser.avatarUrl,
       isAvailable: updatedUser.isAvailable,
       socialLinks: updatedUser.socialLinks,
     });
@@ -98,7 +122,7 @@ router.put('/profile', protect, profileValidation, async (req, res) => {
 
 // @route   POST /api/users/skills
 // @access  Private — always writes to the JWT user's skills, never a foreign userId
-router.post('/skills', protect, skillValidation, async (req, res) => {
+router.post("/skills", protect, skillValidation, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ message: errors.array()[0].msg });
@@ -107,16 +131,22 @@ router.post('/skills', protect, skillValidation, async (req, res) => {
   const { skillId, type, level } = req.body;
 
   try {
-    const existing = await UserSkill.findOne({ userId: req.user._id, skillId, type });
+    const existing = await UserSkill.findOne({
+      userId: req.user._id,
+      skillId,
+      type,
+    });
     if (existing) {
-      return res.status(400).json({ message: `Skill already added to ${type} list` });
+      return res
+        .status(400)
+        .json({ message: `Skill already added to ${type} list` });
     }
 
     const skillData = { userId: req.user._id, skillId, type };
     if (level) skillData.level = level;
 
     const userSkill = await UserSkill.create(skillData);
-    const populated = await userSkill.populate('skillId');
+    const populated = await userSkill.populate("skillId");
     res.status(201).json(populated);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -125,9 +155,11 @@ router.post('/skills', protect, skillValidation, async (req, res) => {
 
 // @route   GET /api/users/skills
 // @access  Private
-router.get('/skills', protect, async (req, res) => {
+router.get("/skills", protect, async (req, res) => {
   try {
-    const skills = await UserSkill.find({ userId: req.user._id }).populate('skillId');
+    const skills = await UserSkill.find({ userId: req.user._id }).populate(
+      "skillId",
+    );
     res.json(skills);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -136,17 +168,21 @@ router.get('/skills', protect, async (req, res) => {
 
 // @route   DELETE /api/users/skills/:id
 // @access  Private — findOne({ _id, userId: req.user._id }) ensures ownership
-router.delete('/skills/:id', protect, async (req, res) => {
+router.delete("/skills/:id", protect, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-    return res.status(400).json({ message: 'Invalid skill id' });
+    return res.status(400).json({ message: "Invalid skill id" });
   }
   try {
     // Ownership enforced: only deletes if both _id matches AND userId matches JWT
-    const userSkill = await UserSkill.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!userSkill) return res.status(404).json({ message: 'User skill not found' });
+    const userSkill = await UserSkill.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
+    if (!userSkill)
+      return res.status(404).json({ message: "User skill not found" });
 
     await userSkill.deleteOne();
-    res.json({ message: 'Skill removed' });
+    res.json({ message: "Skill removed" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -154,26 +190,27 @@ router.delete('/skills/:id', protect, async (req, res) => {
 
 // @route   GET /api/users/reviews
 // @access  Private
-router.get('/reviews', protect, async (req, res) => {
+router.get("/reviews", protect, async (req, res) => {
   try {
     const reviews = await Review.find({ targetUserId: req.user._id })
-      .populate('reviewerId', 'name avatarUrl username')
-      .populate('skillId', 'name')
+      .populate("reviewerId", "name avatarUrl username")
+      .populate("skillId", "name")
       .sort({ createdAt: -1 });
-    
-    const user = await User.findById(req.user._id).select('hoursTaught');
+
+    const user = await User.findById(req.user._id).select("hoursTaught");
     const hoursTaught = user?.hoursTaught || 0;
 
     let averageRating = 0;
     if (reviews.length > 0) {
-      averageRating = reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length;
+      averageRating =
+        reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length;
     }
 
     res.json({
       reviews,
       averageRating: parseFloat(averageRating.toFixed(1)),
       totalReviews: reviews.length,
-      hoursTaught
+      hoursTaught,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -182,15 +219,15 @@ router.get('/reviews', protect, async (req, res) => {
 
 // @route   POST /api/users/reviews
 // @access  Private
-router.post('/reviews', protect, async (req, res) => {
+router.post("/reviews", protect, async (req, res) => {
   const { targetUserId, skillId, rating, comment } = req.body;
 
   if (!targetUserId || !skillId || !rating) {
-    return res.status(400).json({ message: 'Missing required fields' });
+    return res.status(400).json({ message: "Missing required fields" });
   }
 
   if (targetUserId === req.user._id.toString()) {
-    return res.status(400).json({ message: 'You cannot review yourself' });
+    return res.status(400).json({ message: "You cannot review yourself" });
   }
 
   try {
@@ -199,9 +236,9 @@ router.post('/reviews', protect, async (req, res) => {
       reviewerId: req.user._id,
       skillId,
       rating,
-      comment
+      comment,
     });
-    
+
     // Add 1 hour taught to the target user optionally? We'll just leave it or increment it.
     await User.findByIdAndUpdate(targetUserId, { $inc: { hoursTaught: 1 } });
 
@@ -213,20 +250,22 @@ router.post('/reviews', protect, async (req, res) => {
 
 // @route   DELETE /api/users/me
 // @access  Private — user deletes their own account
-router.delete('/me', protect, async (req, res) => {
+router.delete("/me", protect, async (req, res) => {
   const { password } = req.body;
   if (!password) {
-    return res.status(400).json({ message: 'Password is required to confirm deletion' });
+    return res
+      .status(400)
+      .json({ message: "Password is required to confirm deletion" });
   }
 
   try {
     const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     // Re-authenticate
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Incorrect password' });
+      return res.status(401).json({ message: "Incorrect password" });
     }
 
     const userId = user._id;
@@ -245,22 +284,36 @@ router.delete('/me', protect, async (req, res) => {
 
     try {
       // 1. Find all exchange requests involving the user
-      const requests = await ExchangeRequest.find({
-        $or: [{ senderId: userId }, { receiverId: userId }]
-      }, null, opts);
-      const requestIds = requests.map(r => r._id);
+      const requests = await ExchangeRequest.find(
+        {
+          $or: [{ senderId: userId }, { receiverId: userId }],
+        },
+        null,
+        opts,
+      );
+      const requestIds = requests.map((r) => r._id);
 
       // 2. Find all rooms related to those requests
-      const rooms = await Room.find({ exchangeRequestId: { $in: requestIds } }, null, opts);
-      const roomIds = rooms.map(r => r._id);
+      const rooms = await Room.find(
+        { exchangeRequestId: { $in: requestIds } },
+        null,
+        opts,
+      );
+      const roomIds = rooms.map((r) => r._id);
 
       // 3. Delete messages in those requests
-      await Message.deleteMany({ exchangeRequestId: { $in: requestIds } }, opts);
+      await Message.deleteMany(
+        { exchangeRequestId: { $in: requestIds } },
+        opts,
+      );
 
       // 4. Delete RoomParticipants in those rooms (and any dangling ones for this user)
-      await RoomParticipant.deleteMany({
-        $or: [{ roomId: { $in: roomIds } }, { userId }]
-      }, opts);
+      await RoomParticipant.deleteMany(
+        {
+          $or: [{ roomId: { $in: roomIds } }, { userId }],
+        },
+        opts,
+      );
 
       // 5. Delete the rooms
       await Room.deleteMany({ _id: { $in: roomIds } }, opts);
@@ -272,7 +325,10 @@ router.delete('/me', protect, async (req, res) => {
       await UserSkill.deleteMany({ userId }, opts);
 
       // 8. Delete user's reviews
-      await Review.deleteMany({ $or: [{ targetUserId: userId }, { reviewerId: userId }] }, opts);
+      await Review.deleteMany(
+        { $or: [{ targetUserId: userId }, { reviewerId: userId }] },
+        opts,
+      );
 
       // 9. Delete the user
       await User.deleteOne({ _id: userId }, opts);
@@ -290,9 +346,13 @@ router.delete('/me', protect, async (req, res) => {
     }
 
     // Invalidate session
-    res.cookie('jwt', '', { httpOnly: true, expires: new Date(0) });
-    res.json({ message: 'Account and all related data deleted successfully' });
-
+    res.cookie("jwt", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== "development",
+      sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
+      expires: new Date(0),
+    });
+    res.json({ message: "Account and all related data deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
