@@ -53,6 +53,10 @@ setupSocket(io);
 app.set('io', io);
 
 // ─── REST routes ─────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/auth',      authRoutes);
 app.use('/api/users',     userRoutes);
 app.use('/api/skills',    skillRoutes);

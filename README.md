@@ -71,10 +71,10 @@ git clone https://github.com/your-username/skill-exchange-platform.git
 cd skill-exchange-platform
 ```
 
-### 2. Setup the Server
+### 2. Setup the Backend
 Navigate to the `server` directory and install dependencies:
 ```bash
-cd server
+cd backend
 npm install
 ```
 
@@ -83,7 +83,7 @@ Create a `.env` file based on `.env.example`:
 cp .env.example .env
 ```
 
-**Required Environment Variables (`server/.env`)**
+**Required Environment Variables (`backend/.env`)**
 | Variable | Description | Example Value |
 | --- | --- | --- |
 | `PORT` | The port the backend runs on | `5000` |
@@ -92,10 +92,10 @@ cp .env.example .env
 | `NODE_ENV` | Environment mode | `development` |
 | `CLIENT_URL` | The URL of the frontend app for CORS | `http://localhost:5173` |
 
-### 3. Setup the Client
+### 3. Setup the Frontend
 Open a new terminal, navigate to the `client` directory, and install dependencies:
 ```bash
-cd client
+cd frontend
 npm install
 ```
 
@@ -121,7 +121,7 @@ npm run seed:demo
 
 ```text
 skill-exchange-platform/
-├── client/
+├── frontend/
 │   ├── src/
 │   │   ├── api/            # Axios instance
 │   │   ├── components/     # Reusable UI (Navbar, ChatPanel, etc.)
@@ -129,7 +129,7 @@ skill-exchange-platform/
 │   │   └── pages/          # React views (Dashboard, Discover, ChatView, Room, etc.)
 │   ├── package.json
 │   └── vite.config.js
-└── server/
+└── backend/
     ├── config/             # DB connection logic
     ├── middleware/         # Auth & validation middleware
     ├── models/             # Mongoose schemas (User, ExchangeRequest, Message, etc.)
@@ -150,3 +150,4 @@ skill-exchange-platform/
 ## License
 
 *No license is currently specified for this repository. Please consider adding an open-source license (such as MIT) if you plan to share this publicly.*
+

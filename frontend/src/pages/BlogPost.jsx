@@ -25,8 +25,8 @@ export default function BlogPost() {
   const [deleting, setDeleting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Mock engagement state
-  const [likes, setLikes] = useState(Math.floor(Math.random() * 50) + 5);
+  // Engagement state
+  const [likes, setLikes] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
 
@@ -35,6 +35,10 @@ export default function BlogPost() {
       try {
         const { data } = await api.get(`/posts/${id}`);
         setPost(data);
+        if (data.likes) {
+          setLikes(data.likes.length);
+          setIsLiked(user && data.likes.includes(user._id));
+        }
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load post');
       } finally {
@@ -42,7 +46,7 @@ export default function BlogPost() {
       }
     };
     fetchPost();
-  }, [id]);
+  }, [id, user]);
 
   const handleDelete = async () => {
     if (!window.confirm('Are you sure you want to delete this post?')) return;
@@ -65,13 +69,30 @@ export default function BlogPost() {
     }
   };
 
-  const toggleLike = () => {
-    if (isLiked) {
-      setLikes(prev => prev - 1);
-      setIsLiked(false);
-    } else {
-      setLikes(prev => prev + 1);
-      setIsLiked(true);
+  const toggleLike = async () => {
+    if (!user) {
+      alert('You must be logged in to like a post.');
+      return;
+    }
+
+    // Optimistic update
+    const previousIsLiked = isLiked;
+    const previousLikes = likes;
+    
+    setIsLiked(!previousIsLiked);
+    setLikes(prev => previousIsLiked ? prev - 1 : prev + 1);
+
+    try {
+      const { data } = await api.post(`/posts/${id}/like`);
+      if (data.likes) {
+        setLikes(data.likes.length);
+        setIsLiked(data.likes.includes(user._id));
+      }
+    } catch (err) {
+      console.error('Failed to toggle like', err);
+      // Revert on failure
+      setIsLiked(previousIsLiked);
+      setLikes(previousLikes);
     }
   };
 
