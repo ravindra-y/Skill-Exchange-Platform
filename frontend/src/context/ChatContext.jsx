@@ -10,7 +10,7 @@ import { io } from 'socket.io-client';
 import { AuthContext } from './AuthContext';
 import api from '../api/axios';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = 'https://skill-exchange-platform-nypl.onrender.com'
 
 export const ChatContext = createContext(null);
 

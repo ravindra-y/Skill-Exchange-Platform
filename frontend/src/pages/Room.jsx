@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import ChatPanel from '../components/ChatPanel';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = 'https://skill-exchange-platform-nypl.onrender.com'
 
 const RTC_CONFIG = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -720,7 +720,7 @@ export default function Room() {
     ctx.globalCompositeOperation = 'source-over';
     ctx.strokeStyle = shape.color;
     ctx.lineWidth = shape.width;
-    
+
     if (shape.type === 'rect') {
       ctx.strokeRect(shape.x0, shape.y0, shape.x1 - shape.x0, shape.y1 - shape.y0);
     } else if (shape.type === 'circle') {
@@ -833,7 +833,7 @@ export default function Room() {
     if (!ctxRef.current || !canvasRef.current) return;
     const ctx = ctxRef.current;
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    
+
     let activeImagesMap = new Map();
     let deletedImagesMap = new Map();
     let deletedObjectsSet = new Set();
@@ -941,7 +941,7 @@ export default function Room() {
         handleRedoRef.current();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
@@ -964,8 +964,8 @@ export default function Room() {
       for (let i = globalActionLog.current.length - 1; i >= 0; i--) {
         const action = globalActionLog.current[i];
         if (action.isUndone) continue;
-        
-        const isAlreadyDeleted = globalActionLog.current.some(a => 
+
+        const isAlreadyDeleted = globalActionLog.current.some(a =>
           !a.isUndone && (a.type === 'delete-element' || a.type === 'delete-image') && a.targetId === action.id
         );
         if (isAlreadyDeleted) continue;
@@ -1136,7 +1136,7 @@ export default function Room() {
     if (tool === 'delete-element') {
       e.preventDefault();
       e.stopPropagation();
-      
+
       const actionId = Date.now().toString();
       addActionToLog({ id: actionId, userId: user._id, type: 'delete-element', targetId: img.id });
       renderCanvasFromLog();
@@ -1412,7 +1412,7 @@ export default function Room() {
 
         {/* Center: Canvas / Editor */}
         <div className="flex flex-col flex-1 overflow-hidden relative bg-brand-surface-2">
-          
+
           {activeTab === 'whiteboard' && (
             <>
               {/* Vertical Floating Whiteboard Toolbar */}
@@ -1457,7 +1457,7 @@ export default function Room() {
                 </div>
 
                 <div className="w-full h-px bg-black/[0.08] my-1" />
-                
+
                 <button onClick={handleUndo} disabled={!canUndo} className="p-2.5 rounded-xl transition-all disabled:opacity-30 hover:bg-black/[0.04] text-brand-muted" title="Undo">
                   <Undo className="w-4 h-4" />
                 </button>
@@ -1489,7 +1489,7 @@ export default function Room() {
                     )}
                   </div>
                 ))}
-                
+
                 <canvas
                   ref={canvasRef}
                   style={{ pointerEvents: tool === 'pointer' ? 'none' : 'auto', zIndex: 20 }}
@@ -1539,8 +1539,8 @@ export default function Room() {
             <div className="absolute inset-0 bg-brand-surface z-0 p-8 overflow-auto">
               <div className="max-w-2xl mx-auto h-full flex flex-col">
                 <h3 className="text-xl font-medium mb-4 text-brand-text">Session Notes & Agenda</h3>
-                <textarea 
-                  className="flex-1 w-full p-4 bg-brand-surface-2 rounded-xl border border-black/[0.08] focus:outline-none focus:border-brand-text focus:ring-1 focus:ring-brand-text resize-none text-[15px] leading-relaxed" 
+                <textarea
+                  className="flex-1 w-full p-4 bg-brand-surface-2 rounded-xl border border-black/[0.08] focus:outline-none focus:border-brand-text focus:ring-1 focus:ring-brand-text resize-none text-[15px] leading-relaxed"
                   placeholder="Draft your session agenda or notes here... (Placeholder for shared notes)"
                 />
               </div>
@@ -1572,7 +1572,7 @@ export default function Room() {
         >
           {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </button>
-        
+
         <div className="w-px h-6 bg-white/20 mx-1" />
 
         {/* Record / Stop + Download */}
