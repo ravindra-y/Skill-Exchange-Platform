@@ -149,6 +149,12 @@ module.exports = function setupSocket(io) {
       socket.to(roomId).emit('whiteboard-permanent-delete', { targetId, actionId, userId });
     });
 
+    socket.on('code-change', ({ roomId, code }) => {
+      if (!roomId || socket.currentRoomId !== roomId) return;
+      socket.to(roomId).emit('code-change', { code });
+    });
+
+
     // ─── Leave / disconnect cleanup (video room) ──────────────────────────
     const handleLeave = () => {
       const roomId = socket.currentRoomId;

@@ -9,6 +9,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { AuthContext } from '../context/AuthContext';
 import api from '../api/axios';
+import Editor from '@monaco-editor/react';
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff,
   ArrowLeft, Pencil, Eraser, Trash2, Wifi, WifiOff,
@@ -145,6 +146,9 @@ export default function Room() {
   const [deletedImages, setDeletedImages] = useState([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeletedPanel, setShowDeletedPanel] = useState(false);
+
+  // ── Code state ────────────────────────────────────────────────────────────
+  const [codeContent, setCodeContent] = useState('// Collaborative Code Editor\n\nfunction helloWorld() {\n  return "Welcome to the session!";\n}');
 
   // ── Workspace tabs ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('whiteboard'); // 'whiteboard', 'code', 'notes'
@@ -301,6 +305,11 @@ export default function Room() {
       socket.on('whiteboard-redo', ({ actionId }) => {
         const action = globalActionLog.current.find(a => a.id === actionId);
         if (action) { action.isUndone = false; renderCanvasFromLog(); updateUndoRedoState(); }
+      });
+
+      // 2f. Code Editor Sync
+      socket.on('code-change', ({ code }) => {
+        setCodeContent(code);
       });
     };
 
@@ -1525,12 +1534,26 @@ export default function Room() {
               <div className="flex bg-[#2d2d2d] px-4 py-2 border-b border-[#3e3e3e]">
                 <div className="px-3 py-1 bg-[#1e1e1e] text-gray-300 text-xs font-medium rounded-t-md">index.js</div>
               </div>
-              <div className="flex-1 p-6 text-gray-400 font-mono text-sm leading-relaxed overflow-auto">
-                <span className="text-gray-500">{"// Collaborative Code Editor Placeholder"}</span><br/><br/>
-                <span className="text-pink-500">function</span> <span className="text-blue-400">helloWorld</span>() {"{"}<br/>
-                &nbsp;&nbsp;<span className="text-pink-500">return</span> <span className="text-yellow-300">"Welcome to the session!"</span>;<br/>
-                {"}"}<br/><br/>
-                <span className="text-gray-500">{"/* Code editor implementation goes here... */"}</span>
+              <div className="flex-1 overflow-hidden pt-4">
+                <Editor
+                  height="100%"
+                  defaultLanguage="javascript"
+                  theme="vs-dark"
+                  value={codeContent}
+                  onChange={(value) => {
+                    setCodeContent(value || '');
+                    if (socketRef.current) {
+                      socketRef.current.emit('code-change', { roomId: roomIdRef.current, code: value || '' });
+                    }
+                  }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 15,
+                    wordWrap: 'on',
+                    scrollBeyondLastLine: false,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace"
+                  }}
+                />
               </div>
             </div>
           )}
