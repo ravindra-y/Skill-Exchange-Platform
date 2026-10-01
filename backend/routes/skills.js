@@ -1,5 +1,6 @@
 const express = require('express');
 const Skill = require('../models/Skill');
+const escoService = require('../services/escoService');
 
 const router = express.Router();
 
@@ -14,51 +15,53 @@ router.get('/', async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
 // @route   GET /api/skills/search
-// @desc    Search skills from ESCO API
+// @desc    Search skills from ESCO dataset / API with prefix, alias & fuzzy matching
 // @access  Public
 router.get('/search', async (req, res) => {
   try {
     const q = req.query.q;
-    if (!q || q.trim().length < 2) {
+    if (!q || typeof q !== 'string' || q.trim().length === 0) {
       return res.json([]);
     }
 
-    const escoUrl = `https://ec.europa.eu/esco/api/suggest2?text=${encodeURIComponent(q.trim())}&language=en&type=skill&offset=0&limit=10&alt=true&selectedVersion=latest&viewObsolete=false`;
-    
-    // Use dynamic import for node-fetch or use native fetch if Node 18+ (which is likely)
-    const response = await fetch(escoUrl);
-    if (!response.ok) {
-      throw new Error(`ESCO API responded with status ${response.status}`);
-    }
-    const data = await response.json();
-    
-    const results = data._embedded?.results || [];
-    const mappedSkills = results.map(item => ({
-      id: item.uri,
-      name: item.title,
-    }));
-
-    res.json(mappedSkills);
+    const limit = parseInt(req.query.limit, 10) || 8;
+    const results = await escoService.search(q.trim(), limit);
+    res.json(results);
   } catch (error) {
-    console.error('ESCO API Error:', error.message);
-    // Return empty array on external API error to not break the page completely
-    res.json([]);
+    console.error('Skill Search Error:', error.message);
+    res.status(500).json({ message: 'Failed to search skills', error: error.message });
   }
 });
 
 // @route   POST /api/skills
-// @desc    Find or create a skill (used when selecting an ESCO skill)
-// @access  Private (or Public if no protect middleware)
+// @desc    Find or create a skill with canonical name normalization (prevents duplicate variants)
+// @access  Public
 router.post('/', async (req, res) => {
   try {
-    const { name, category } = req.body;
-    if (!name) return res.status(400).json({ message: 'Skill name is required' });
-    
-    let skill = await Skill.findOne({ name });
-    if (!skill) {
-      skill = await Skill.create({ name, category: category || 'Other' });
+    const { name, category, escoUri } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ message: 'Skill name is required' });
     }
+
+    // Resolve canonical representation
+    const canonical = escoService.getCanonical(name.trim());
+    const canonicalName = canonical ? canonical.canonicalName : name.trim();
+    const finalCategory = category || (canonical ? canonical.category : 'General');
+
+    // Case-insensitive search to prevent duplicates like "react" vs "React"
+    let skill = await Skill.findOne({
+      name: { $regex: new RegExp(`^${canonicalName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+    });
+
+    if (!skill) {
+      skill = await Skill.create({
+        name: canonicalName,
+        category: finalCategory
+      });
+    }
+
     res.status(201).json(skill);
   } catch (error) {
     res.status(500).json({ message: error.message });

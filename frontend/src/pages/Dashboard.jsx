@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
+import SkillAutocomplete from '../components/SkillAutocomplete';
 
 // ─── Avatar placeholder ────────────────────────────────────────────────────────
 const AvatarPlaceholder = ({ name, size = 72 }) => {
@@ -62,13 +63,9 @@ const Dashboard = () => {
   const [avatarError, setAvatarError]     = useState('');
 
   // ── Skill state ──
-  const [skillType, setSkillType]   = useState('teach');
-  const [skillLevel, setSkillLevel] = useState('Beginner');
-  const [skillSearch, setSkillSearch] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [filteredSkills, setFilteredSkills]   = useState([]);
+  const [skillType, setSkillType]             = useState('teach');
+  const [skillLevel, setSkillLevel]           = useState('Beginner');
   const [suggestedSkills, setSuggestedSkills] = useState([]);
-  const [isSearching, setIsSearching]         = useState(false);
 
   // ── Password change state ──
   const [passwordForm, setPasswordForm] = useState({
@@ -262,50 +259,37 @@ const Dashboard = () => {
     }
   };
 
-  // ── Skill search debounce ──
-  useEffect(() => {
-    if (skillSearch.trim().length < 2) {
-      setFilteredSkills([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    const controller = new AbortController();
-
-    const fetchSkills = async () => {
-      try {
-        const res = await axios.get(`/skills/search?q=${encodeURIComponent(skillSearch)}`, {
-          signal: controller.signal,
-        });
-        const results = res.data.filter(
-          s => !skills.some(us => us.skillId?.name?.toLowerCase() === s.name.toLowerCase())
-        );
-        setFilteredSkills(results);
-      } catch (error) {
-        if (!axios.isCancel(error)) {
-          setFilteredSkills([]);
-        }
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const timer = setTimeout(fetchSkills, 300);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [skillSearch, skills]);
-
   useEffect(() => {
     const available = allSkills.filter(s =>
-      !skills.some(us => us.skillId?._id === s._id || us.skillId?.name === s.name)
+      !skills.some(us => us.skillId?._id === s._id || us.skillId?.name?.toLowerCase() === s.name?.toLowerCase())
     );
     setSuggestedSkills(available.slice(0, 5));
   }, [allSkills, skills]);
 
   const handleAddSkill = async (skillObj) => {
     setPageError('');
+    if (!skillObj) return;
+
+    const skillName = skillObj.canonicalName || skillObj.name;
+    const targetName = skillName.trim().toLowerCase();
+
+    // Prevent duplicate selection for this user under the selected type
+    const isDuplicate = skills.some(us => {
+      const existingName = (us.skillId?.name || '').trim().toLowerCase();
+      return existingName === targetName && us.type === skillType;
+    });
+
+    if (isDuplicate) {
+      setPageError(`"${skillName}" is already in your "${skillType === 'teach' ? 'Skills I can teach' : 'Skills I want to learn'}" list.`);
+      return;
+    }
+
     try {
-      const res = await axios.post('/skills', { name: skillObj.name });
+      const res = await axios.post('/skills', {
+        name: skillName,
+        category: skillObj.category,
+        escoUri: skillObj.id
+      });
       const finalSkillId = res.data._id;
       await axios.post('/users/skills', { skillId: finalSkillId, type: skillType, level: skillLevel });
       fetchData();
@@ -759,53 +743,13 @@ const Dashboard = () => {
       <div className="card card-body mb-6 relative">
         <h3 className="text-sm font-medium text-brand-text mb-4">Add a skill</h3>
         <div className="flex flex-col sm:flex-row gap-3 items-start">
-          <div className="flex-1 w-full relative">
+          <div className="flex-1 w-full">
             <label className="input-label">Search skills</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-brand-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="e.g. Project Management"
-                value={skillSearch}
-                onChange={e => { setSkillSearch(e.target.value); setShowSuggestions(true); }}
-                onFocus={() => setShowSuggestions(true)}
-                className="input-field pl-10"
-              />
-            </div>
-
-            {/* Dropdown */}
-            {showSuggestions && skillSearch.trim().length >= 2 && (
-              <div className="absolute z-10 mt-1 w-full bg-brand-surface border border-black/[0.08] rounded-[8px] shadow-lg max-h-60 overflow-y-auto">
-                {isSearching ? (
-                  <div className="px-4 py-3 text-sm text-brand-muted flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Searching…
-                  </div>
-                ) : filteredSkills.length > 0 ? (
-                  <ul className="py-1">
-                    {filteredSkills.map(s => (
-                      <li
-                        key={s.id || s._id}
-                        className="px-4 py-2 hover:bg-brand-surface-2 cursor-pointer text-sm text-brand-text transition-colors"
-                        onClick={() => {
-                          handleAddSkill(s);
-                          setSkillSearch('');
-                          setShowSuggestions(false);
-                        }}
-                      >
-                        {s.name}
-                        {s.category && <span className="text-brand-faint text-xs ml-2">({s.category})</span>}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="px-4 py-3 text-sm text-brand-muted">No skills found. Try a different search.</div>
-                )}
-              </div>
-            )}
+            <SkillAutocomplete
+              onSelectSkill={handleAddSkill}
+              existingSkills={skills.filter(s => s.type === skillType)}
+              placeholder="Search skills (e.g. Python, React, SQL)..."
+            />
           </div>
 
           <div className="w-full sm:w-44">
