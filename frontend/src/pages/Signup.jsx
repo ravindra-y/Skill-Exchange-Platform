@@ -1,11 +1,12 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Loader2, KeyRound, Mail, Copy, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Loader2, KeyRound, Mail, Copy, CheckCircle2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 
 const Signup = () => {
   const [authMethod, setAuthMethod] = useState('email'); // 'email' or 'key'
   const [formData, setFormData] = useState({ name: '', username: '', email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [generatedKey, setGeneratedKey] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError]       = useState('');
@@ -147,13 +148,24 @@ const Signup = () => {
             </div>
             <div>
               <label className="input-label">Password</label>
-              <input
-                type="password"
-                name="password"
-                required
-                className="input-field"
-                onChange={handleChange}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  required
+                  className="input-field pr-10"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text transition-colors p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

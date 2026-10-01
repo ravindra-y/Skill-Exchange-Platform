@@ -3,7 +3,8 @@ import axios from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 import {
   Plus, Trash2, Loader2, MessageSquare, AlertTriangle, X,
-  Camera, CheckCircle2, Pencil, Github, Linkedin, Globe, Star
+  Camera, CheckCircle2, Pencil, Github, Linkedin, Globe, Star,
+  Eye, EyeOff, KeyRound
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useChat } from '../context/ChatContext';
@@ -69,11 +70,25 @@ const Dashboard = () => {
   const [suggestedSkills, setSuggestedSkills] = useState([]);
   const [isSearching, setIsSearching]         = useState(false);
 
+  // ── Password change state ──
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword]         = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving]           = useState(false);
+  const [passwordError, setPasswordError]             = useState('');
+  const [passwordSuccess, setPasswordSuccess]         = useState('');
+
   // ── Delete account state ──
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletePassword, setDeletePassword]   = useState('');
-  const [deleteError, setDeleteError]         = useState('');
-  const [deleting, setDeleting]               = useState(false);
+  const [showDeleteModal, setShowDeleteModal]         = useState(false);
+  const [deletePassword, setDeletePassword]           = useState('');
+  const [showDeletePassword, setShowDeletePassword]   = useState(false);
+  const [deleteError, setDeleteError]                 = useState('');
+  const [deleting, setDeleting]                       = useState(false);
 
   // ── Initial data fetch ──
   useEffect(() => { fetchData(); }, []);
@@ -306,6 +321,45 @@ const Dashboard = () => {
       fetchData();
     } catch (error) {
       setPageError(error.response?.data?.message || 'Failed to remove skill.');
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      setPasswordError('New password must be different from current password.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await axios.put('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordSuccess(res.data?.message || 'Password updated successfully!');
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+      setTimeout(() => setPasswordSuccess(''), 4000);
+    } catch (error) {
+      setPasswordError(error.response?.data?.message || 'Failed to update password. Please check your current password.');
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -857,6 +911,109 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* ── Security: Password Change ────────────────────────────────────────── */}
+      <div className="card card-body mb-6">
+        <h3 className="text-sm font-medium text-brand-text mb-2 flex items-center gap-2">
+          <KeyRound className="w-4 h-4" /> Change Password
+        </h3>
+        <p className="text-sm text-brand-muted mb-4">
+          Update your password to keep your account secure.
+        </p>
+
+        {passwordError && (
+          <div className="mb-4 px-4 py-3 text-sm text-status-error bg-[#fef2f2] border border-[#fca5a5] rounded-[8px]">
+            {passwordError}
+          </div>
+        )}
+
+        {passwordSuccess && (
+          <div className="mb-4 px-4 py-3 text-sm text-status-success bg-[#f0fdf4] border border-[#86efac] rounded-[8px] flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-status-success shrink-0" />
+            <span>{passwordSuccess}</span>
+          </div>
+        )}
+
+        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+          <div>
+            <label className="input-label">Current password</label>
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? 'text' : 'password'}
+                required
+                value={passwordForm.currentPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, currentPassword: e.target.value }))}
+                className="input-field pr-10"
+                placeholder="Enter current password"
+                disabled={passwordSaving}
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text transition-colors p-1"
+                aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+              >
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="input-label">New password</label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                required
+                value={passwordForm.newPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, newPassword: e.target.value }))}
+                className="input-field pr-10"
+                placeholder="Minimum 6 characters"
+                disabled={passwordSaving}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text transition-colors p-1"
+                aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="input-label">Confirm new password</label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                value={passwordForm.confirmPassword}
+                onChange={e => setPasswordForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                className="input-field pr-10"
+                placeholder="Re-type new password"
+                disabled={passwordSaving}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text transition-colors p-1"
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={passwordSaving || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+            className="btn-primary"
+          >
+            {passwordSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {passwordSaving ? 'Updating password…' : 'Update password'}
+          </button>
+        </form>
+      </div>
+
       {/* ── Danger Zone ────────────────────────────────────────────────────── */}
       <div className="card card-body border-status-error/20">
         <h3 className="text-sm font-medium text-status-error mb-2 flex items-center gap-2">
@@ -866,7 +1023,7 @@ const Dashboard = () => {
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
         <button
-          onClick={() => { setShowDeleteModal(true); setDeleteError(''); setDeletePassword(''); }}
+          onClick={() => { setShowDeleteModal(true); setDeleteError(''); setDeletePassword(''); setShowDeletePassword(false); }}
           className="text-sm font-medium text-status-error border border-status-error/30 hover:bg-status-error/5 px-4 py-2 rounded-full transition-colors"
         >
           Delete account
@@ -907,15 +1064,25 @@ const Dashboard = () => {
 
               <form onSubmit={handleDeleteAccount}>
                 <label className="input-label">Enter your password to confirm</label>
-                <input
-                  type="password"
-                  required
-                  value={deletePassword}
-                  onChange={e => setDeletePassword(e.target.value)}
-                  className="input-field mb-5"
-                  placeholder="Password"
-                  disabled={deleting}
-                />
+                <div className="relative mb-5">
+                  <input
+                    type={showDeletePassword ? 'text' : 'password'}
+                    required
+                    value={deletePassword}
+                    onChange={e => setDeletePassword(e.target.value)}
+                    className="input-field pr-10"
+                    placeholder="Password"
+                    disabled={deleting}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDeletePassword(!showDeletePassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-text transition-colors p-1"
+                    aria-label={showDeletePassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showDeletePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <div className="flex gap-3 justify-end">
                   <button
                     type="button"

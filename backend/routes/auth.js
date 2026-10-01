@@ -66,6 +66,14 @@ const loginValidation = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
+// ─── Change password validation rules ─────────────────────────────────────────
+const changePasswordValidation = [
+  body("currentPassword").notEmpty().withMessage("Current password is required"),
+  body("newPassword")
+    .isLength({ min: 6 })
+    .withMessage("New password must be at least 6 characters"),
+];
+
 // @route   POST /api/auth/signup
 router.post("/signup", authLimiter, signupValidation, async (req, res) => {
   const errors = validationResult(req);
@@ -162,6 +170,47 @@ router.get("/me", protect, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put(
+  "/change-password",
+  protect,
+  changePasswordValidation,
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.array()[0].msg });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      if (currentPassword === newPassword) {
+        return res
+          .status(400)
+          .json({ message: "New password must be different from current password" });
+      }
+
+      user.passwordHash = newPassword;
+      await user.save();
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  }
+);
 
 // @route   POST /api/auth/account-signup
 router.post("/account-signup", authLimiter, async (req, res) => {
