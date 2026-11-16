@@ -1,0 +1,207 @@
+/**
+ * Modern IDE / Code Editor Theme
+ * Inspired by VS Code Dark+ & modern development environments.
+ */
+
+/* Container overrides within markdown */
+.markdown-body .ide-code-container {
+  background-color: #1e1e1e !important;
+  border: 1px solid #333338 !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  margin: 1.5rem 0 !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* IDE Window Header */
+.markdown-body .ide-code-header {
+  background-color: #252526 !important;
+  border-bottom: 1px solid #333338 !important;
+  padding: 0.5rem 1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  user-select: none !important;
+}
+
+/* macOS-style window dots */
+.ide-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  display: inline-block;
+}
+
+.ide-dot-red {
+  background-color: #ff5f56;
+  border: 1px solid #e0443e;
+}
+
+.ide-dot-yellow {
+  background-color: #ffbd2e;
+  border: 1px solid #dea123;
+}
+
+.ide-dot-green {
+  background-color: #27c93f;
+  border: 1px solid #1aab29;
+}
+
+/* Pre & Code Element */
+.markdown-body .ide-code-container pre {
+  background-color: #1e1e1e !important;
+  color: #9cdcfe !important; /* Base color matches VS Code variables/identifiers */
+  margin: 0 !important;
+  padding: 1.25rem 1.5rem !important;
+  overflow-x: auto !important;
+  border-radius: 0 !important;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 0.875rem !important;
+  line-height: 1.65 !important;
+  tab-size: 2 !important;
+}
+
+.markdown-body .ide-code-container pre code {
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  white-space: pre !important;
+  word-break: normal !important;
+  word-wrap: normal !important;
+  border: 0 !important;
+}
+
+/* Text Selection inside IDE code block */
+.ide-code-container pre ::selection,
+.ide-code-container pre::selection {
+  background-color: #264f78 !important;
+  color: inherit !important;
+}
+
+/* Sleek Dark Scrollbar for Code Block */
+.markdown-body .ide-code-container pre::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.markdown-body .ide-code-container pre::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.markdown-body .ide-code-container pre::-webkit-scrollbar-thumb {
+  background: #3e3e42;
+  border-radius: 4px;
+}
+
+.markdown-body .ide-code-container pre::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SYNTAX HIGHLIGHTING TOKENS (VS Code Dark+ IDE palette)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Storage & Declaration Keywords: const, let, var, function, class, new, typeof */
+.ide-code-container .token.keyword {
+  color: #569cd6 !important;
+  font-weight: 500 !important;
+}
+
+/* 2. Control-Flow Keywords: return, if, else, for, while, try, catch, import, export, from */
+.ide-code-container .token.keyword.control-flow {
+  color: #c586c0 !important;
+  font-weight: 500 !important;
+}
+
+/* 3. Strings & Character Literals: "express", '/api/skills', `template` */
+.ide-code-container .token.string,
+.ide-code-container .token.char,
+.ide-code-container .token.attr-value {
+  color: #ce9178 !important;
+}
+
+/* 4. Function Names: express(), app.use(), res.json(), getSkills() */
+.ide-code-container .token.function {
+  color: #dcdcaa !important;
+}
+
+/* 5. Built-in Functions & Standard Library: require, fetch, setTimeout, console, Math */
+.ide-code-container .token.builtin,
+.ide-code-container .token.function.builtin,
+.ide-code-container .token.class-name,
+.ide-code-container .token.maybe-class-name {
+  color: #4ec9b0 !important;
+}
+
+/* 6. Variables & Parameters: app, req, res */
+.ide-code-container .token.variable,
+.ide-code-container .token.parameter {
+  color: #9cdcfe !important;
+}
+
+/* 7. Numbers: 1, 2, 3, 3.14, 0xff */
+.ide-code-container .token.number {
+  color: #b5cea8 !important;
+}
+
+/* 8. Operators: =, =>, +, -, *, /, :, ?, <, > */
+.ide-code-container .token.operator {
+  color: #d4d4d4 !important;
+}
+
+/* Arrow functions => get distinctive styling */
+.ide-code-container .token.operator.arrow {
+  color: #569cd6 !important;
+}
+
+/* 9. Comments: // single-line, /* multi-line * / */
+.ide-code-container .token.comment,
+.ide-code-container .token.prolog,
+.ide-code-container .token.doctype,
+.ide-code-container .token.cdata {
+  color: #6a9955 !important;
+  font-style: italic !important;
+}
+
+/* 10. Object Properties: { id: 1, name: "Python" }, obj.property */
+.ide-code-container .token.property,
+.ide-code-container .token.literal-property {
+  color: #9cdcfe !important;
+}
+
+/* 11. Booleans & Constants: true, false, null, undefined */
+.ide-code-container .token.boolean,
+.ide-code-container .token.constant {
+  color: #569cd6 !important;
+}
+
+/* 12. Punctuation: ;, ,, (, ), {, }, [, ] */
+.ide-code-container .token.punctuation {
+  color: #d4d4d4 !important;
+}
+
+/* 13. Regular Expressions */
+.ide-code-container .token.regex {
+  color: #d16969 !important;
+}
+
+/* 14. HTML / JSX Tags & Attributes */
+.ide-code-container .token.tag {
+  color: #569cd6 !important;
+}
+
+.ide-code-container .token.attr-name {
+  color: #9cdcfe !important;
+}
+
+/* 15. Other utilities */
+.ide-code-container .token.important,
+.ide-code-container .token.bold {
+  font-weight: bold !important;
+}
+
+.ide-code-container .token.italic {
+  font-style: italic !important;
+}
