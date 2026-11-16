@@ -19,7 +19,11 @@ import {
 } from 'lucide-react';
 import ChatPanel from '../components/ChatPanel';
 
-const SOCKET_URL = 'https://skill-exchange-platform-nypl.onrender.com';
+const defaultSocketUrl = import.meta.env.DEV
+  ? 'http://localhost:5000'
+  : 'https://skill-exchange-platform-nypl.onrender.com';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : defaultSocketUrl);
 
 const RTC_CONFIG = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],

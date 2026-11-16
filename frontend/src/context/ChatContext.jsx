@@ -10,7 +10,11 @@ import { io } from 'socket.io-client';
 import { AuthContext } from './AuthContext';
 import api from '../api/axios';
 
-const SOCKET_URL = 'https://skill-exchange-platform-nypl.onrender.com'
+const defaultSocketUrl = import.meta.env.DEV
+  ? 'http://localhost:5000'
+  : 'https://skill-exchange-platform-nypl.onrender.com';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '') : defaultSocketUrl);
 
 export const ChatContext = createContext(null);
 
